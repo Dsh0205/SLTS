@@ -1,0 +1,254 @@
+{
+  "english": [
+    {
+      "word": "apple",
+      "meaning": "苹果"
+    },
+    {
+      "word": "banana",
+      "meaning": "香蕉"
+    },
+    {
+      "word": "book",
+      "meaning": "书"
+    },
+    {
+      "word": "computer",
+      "meaning": "电脑"
+    },
+    {
+      "word": "teacher",
+      "meaning": "老师"
+    },
+    {
+      "word": "student",
+      "meaning": "学生"
+    }
+  ],
+  "russian": [
+    {
+      "word": "привет",
+      "meaning": "你好"
+    },
+    {
+      "word": "мир",
+      "meaning": "世界"
+    },
+    {
+      "word": "книга",
+      "meaning": "书"
+    },
+    {
+      "word": "вода",
+      "meaning": "水"
+    },
+    {
+      "word": "окно",
+      "meaning": "窗户"
+    },
+    {
+      "word": "учитель",
+      "meaning": "老师"
+    },
+    {
+      "word": "получить",
+      "meaning": "得到"
+    },
+    {
+      "word": "подарок",
+      "meaning": "礼物"
+    },
+    {
+      "word": "пальто",
+      "meaning": "大衣"
+    },
+    {
+      "word": "обычно",
+      "meaning": "通常"
+    },
+    {
+      "word": "ведро",
+      "meaning": "桶"
+    },
+    {
+      "word": "потом",
+      "meaning": "后来"
+    },
+    {
+      "word": "вдруг",
+      "meaning": "突然"
+    },
+    {
+      "word": "встать",
+      "meaning": "站起来"
+    },
+    {
+      "word": "наконец",
+      "meaning": "最后"
+    },
+    {
+      "word": "привыкать",
+      "meaning": "习惯于"
+    },
+    {
+      "word": "диск",
+      "meaning": "磁盘"
+    },
+    {
+      "word": "лечь",
+      "meaning": "躺下"
+    },
+    {
+      "word": "целый",
+      "meaning": "完整的"
+    },
+    {
+      "word": "длинная",
+      "meaning": "长的"
+    },
+    {
+      "word": "галерея",
+      "meaning": "画廊"
+    },
+    {
+      "word": "впереди",
+      "meaning": "在前面"
+    },
+    {
+      "word": "экскурсия",
+      "meaning": "游览"
+    },
+    {
+      "word": "продать",
+      "meaning": "卖"
+    },
+    {
+      "word": "потерять",
+      "meaning": "丢失"
+    },
+    {
+      "word": "скрипк",
+      "meaning": "小提琴"
+    },
+    {
+      "word": "выбрать",
+      "meaning": "选择"
+    },
+    {
+      "word": "записать",
+      "meaning": "记录"
+    },
+    {
+      "word": "лекцию",
+      "meaning": "讲座"
+    },
+    {
+      "word": "обсудить",
+      "meaning": "讨论"
+    },
+    {
+      "word": "погода",
+      "meaning": "天气"
+    },
+    {
+      "word": "опять",
+      "meaning": "又"
+    },
+    {
+      "word": "бросить",
+      "meaning": "扔"
+    },
+    {
+      "word": "мяч",
+      "meaning": "球"
+    },
+    {
+      "word": "помочь",
+      "meaning": "帮助"
+    },
+    {
+      "word": "поэт",
+      "meaning": "诗人"
+    },
+    {
+      "word": "найти",
+      "meaning": "找到"
+    },
+    {
+      "word": "опоздать",
+      "meaning": "迟到"
+    },
+    {
+      "word": "бегать",
+      "meaning": "跑"
+    },
+    {
+      "word": "внуки",
+      "meaning": "孙子"
+    },
+    {
+      "word": "писатель",
+      "meaning": "作家"
+    },
+    {
+      "word": "во время",
+      "meaning": "在…… 期间"
+    },
+    {
+      "word": "верить",
+      "meaning": "相信"
+    },
+    {
+      "word": "дорог",
+      "meaning": "道路"
+    },
+    {
+      "word": "кажется",
+      "meaning": "看来"
+    },
+    {
+      "word": "забыть",
+      "meaning": "忘记"
+    },
+    {
+      "word": "взять",
+      "meaning": "拿/取"
+    },
+    {
+      "word": "узнать",
+      "meaning": "得到/知道了解"
+    },
+    {
+      "word": "дело",
+      "meaning": "事情"
+    },
+    {
+      "word": "приходить",
+      "meaning": "来"
+    },
+    {
+      "word": "ноября",
+      "meaning": "十一月"
+    },
+    {
+      "word": "прыгать",
+      "meaning": "跳"
+    },
+    {
+      "word": "над",
+      "meaning": "上面"
+    },
+    {
+      "word": "подо",
+      "meaning": "下面"
+    },
+    {
+      "word": "кровать",
+      "meaning": "床"
+    },
+    {
+      "word": "олень",
+      "meaning": "驴"
+    }
+  ]
+}

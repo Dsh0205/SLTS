@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>彩虹抽奖轮盘</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="wheel-card">
+      <div class="wheel-stage">
+        <div class="wheel-shell" id="wheelShell">
+          <div class="pointer" aria-hidden="true"></div>
+          <div class="lights" aria-hidden="true">
+            <span style="--i:0;--light:#ff7395;"></span>
+            <span style="--i:1;--light:#ffa64d;"></span>
+            <span style="--i:2;--light:#ffd764;"></span>
+            <span style="--i:3;--light:#9be44f;"></span>
+            <span style="--i:4;--light:#5fd3ff;"></span>
+            <span style="--i:5;--light:#9388ff;"></span>
+            <span style="--i:6;--light:#ca77ff;"></span>
+            <span style="--i:7;--light:#ff7cd6;"></span>
+          </div>
+
+          <div class="wheel-rim">
+            <div class="wheel-frame">
+              <canvas id="wheel" width="720" height="720" aria-label="抽奖轮盘"></canvas>
+            </div>
+          </div>
+
+          <button class="spin-button" id="spinButton" type="button">
+            <span>Prize</span>
+          </button>
+        </div>
+
+        <div class="result-panel">
+          <p class="result-label">本次结果</p>
+          <p class="result-value" id="resultText">等待开始</p>
+        </div>
+      </div>
+
+      <section class="editor-panel" aria-labelledby="editorTitle">
+        <div class="editor-heading">
+          <h2 id="editorTitle">手动添加轮盘内容</h2>
+        </div>
+
+        <label class="editor-label" for="itemInput">请输入</label>
+        <div class="input-row">
+          <input id="itemInput" type="text" maxlength="18">
+          <button class="secondary-button" id="addItemButton" type="button">添加</button>
+        </div>
+
+        <div class="editor-actions">
+          <button class="ghost-button" id="clearItemsButton" type="button">清空</button>
+          <button class="ghost-button" id="resetItemsButton" type="button">恢复</button>
+        </div>
+
+        <div class="items-list" id="itemsList" aria-live="polite"></div>
+        <p class="editor-meta" id="segmentsMeta">当前 8 项</p>
+      </section>
+    </section>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>

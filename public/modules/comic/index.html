@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>漫画查询</title>
+  <style>
+    :root {
+      --bg: #6b6b6b;
+      --bg-soft: #4b4b4b;
+      --text: #f3f4f6;
+      --muted: #d1d5db;
+      --card: #2f2f2f;
+      --border: rgba(255, 255, 255, 0.14);
+      --primary: #ff7a00;
+      --primary-contrast: #140b05;
+      --accent: #ff9a3d;
+      --danger: #ff9a47;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 14px;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #7a7a7a 0%, #626262 100%);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    main {
+      margin-top: 16px;
+      background: #3a3a3a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 28px;
+    }
+
+    .container {
+      width: min(1080px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 14px;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(58, 58, 58, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 22px;
+    }
+
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 0;
+    }
+
+    .hero {
+      padding: 36px 0 24px;
+    }
+
+    .hero-card,
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -60px -90px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 122, 0, 0.22), transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 122, 0, 0.18);
+      color: var(--accent);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+    }
+
+    .site-title {
+      font-size: 34px;
+      line-height: 1.1;
+      margin-top: 14px;
+    }
+
+    .site-subtitle {
+      margin: 12px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.7;
+    }
+
+    .actions,
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      padding-bottom: 32px;
+    }
+
+    .card {
+      padding: 24px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255, 122, 0, 0.55);
+      background: rgba(255, 122, 0, 0.92);
+      color: #1f140a;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform .12s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 179, 71, 0.95);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      background: #ff8c1a;
+    }
+
+    .btn.primary,
+    .btn.search {
+      background: linear-gradient(135deg, #ff7a00, #ffb347);
+      color: var(--primary-contrast);
+      border-color: transparent;
+      font-weight: 700;
+    }
+
+    .btn.sm {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 10px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .input,
+    .textarea,
+    .select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(78, 78, 78, 0.96);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .input:focus,
+    .textarea:focus,
+    .select:focus {
+      border-color: rgba(255, 154, 71, 0.95);
+      box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.2);
+    }
+
+    .input::placeholder,
+    .textarea::placeholder {
+      color: #d1d5db;
+    }
+
+    .textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .search-input {
+      max-width: 420px;
+      flex: 1 1 260px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #343434;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    .table th,
+    .table td {
+      padding: 14px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      vertical-align: top;
+    }
+
+    .table thead th {
+      color: var(--accent);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+
+    .code-link {
+      color: #ff9a3d;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .code-link:hover {
+      color: #ffc27a;
+      text-decoration: underline;
+    }
+
+    .list {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      line-height: 1.8;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(54, 54, 54, 0.96);
+      border: 1px solid rgba(255, 154, 71, 0.5);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-2px);
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 10px;
+      }
+
+      main {
+        border-radius: 22px;
+      }
+
+      .header-inner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .hero {
+        padding-top: 24px;
+      }
+
+      .hero-card,
+      .card {
+        border-radius: 20px;
+        padding: 18px;
+      }
+
+      .site-title {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div>
+        <div class="eyebrow">Comic Mode</div>
+        <h1 class="site-title">漫画查询</h1>
+      </div>
+      <nav class="actions">
+        <a class="btn" href="./飞机航班查询.html">返回主页</a>
+        <button id="say-hello" class="btn primary">提示按钮</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-card">
+          <h2>橙黑风格漫画页</h2>
+          <p class="site-subtitle">输入格式仍然是“代码/内容/作者”。保存后会显示在下方，代码列会变成超链接，点击后跳转到 `https://18comic.vip/album/检测出的代码/`。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="container grid">
+      <section class="card">
+        <h2>输入文本</h2>
+        <p class="muted">每行一条，例如：123456/作品标题/作者名</p>
+        <div class="row">
+          <textarea id="entry-input" class="textarea" placeholder="在这里输入多行：代码/内容/作者"></textarea>
+        </div>
+        <div class="controls" style="margin-top: 12px;">
+          <label for="sort-by" class="muted">排序方式</label>
+          <select id="sort-by" class="select" style="max-width:220px">
+            <option value="actor">按作者名称</option>
+            <option value="code">按代码字母</option>
+          </select>
+        </div>
+        <div class="controls" style="margin-top: 12px;">
+          <label for="search-box" class="muted">搜索</label>
+          <input id="search-box" class="input search-input" placeholder="输入代码/内容/作者关键字">
+          <button id="search-btn" class="btn search">搜索</button>
+          <button id="clear-search" class="btn">清除</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table" aria-label="漫画条目列表">
+            <thead>
+              <tr>
+                <th style="width:22%">代码</th>
+                <th>内容</th>
+                <th style="width:22%">作者</th>
+                <th style="width:160px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="entry-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>无法识别的文本</h2>
+        <ul id="invalid-list" class="list"></ul>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script>
+    const storageConfig = {
+      entriesKey: "entries-manga-v1",
+      invalidKey: "entries-manga-invalid-v1",
+      codeLinkBase: "https://18comic.vip/album/"
+    };
+
+    const toast = document.getElementById("toast");
+    const helloBtn = document.getElementById("say-hello");
+    const inputBox = document.getElementById("entry-input");
+    const sortSelect = document.getElementById("sort-by");
+    const tbody = document.getElementById("entry-tbody");
+    const searchBox = document.getElementById("search-box");
+    const searchBtn = document.getElementById("search-btn");
+    const clearSearchBtn = document.getElementById("clear-search");
+    const invalidList = document.getElementById("invalid-list");
+
+    let currentQuery = "";
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    helloBtn.addEventListener("click", () => {
+      showToast("漫画页面已就绪");
+    });
+
+    function loadEntries() {
+      try {
+        const raw = localStorage.getItem(storageConfig.entriesKey);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveEntries(arr) {
+      localStorage.setItem(storageConfig.entriesKey, JSON.stringify(arr));
+    }
+
+    function loadInvalid() {
+      try {
+        const raw = localStorage.getItem(storageConfig.invalidKey);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveInvalid(arr) {
+      localStorage.setItem(storageConfig.invalidKey, JSON.stringify(arr));
+    }
+
+    function parseLine(line) {
+      const parts = line.split("/").map((item) => item.trim());
+      if (parts.length < 3) {
+        return null;
+      }
+
+      const code = parts[0];
+      const content = parts[1];
+      const actor = parts.slice(2).join("/");
+
+      if (!code || !actor) {
+        return null;
+      }
+
+      return { code, content, actor };
+    }
+
+    function upsert(arr, entry) {
+      const idx = arr.findIndex((item) => item.code.toLowerCase() === entry.code.toLowerCase());
+      if (idx >= 0) {
+        arr[idx] = { ...arr[idx], ...entry };
+      } else {
+        arr.push(entry);
+      }
+    }
+
+    function sortEntries(arr, by) {
+      const collator = new Intl.Collator("zh-CN", { sensitivity: "base", numeric: true });
+      const copy = arr.slice();
+      if (by === "actor") {
+        copy.sort((a, b) => collator.compare(a.actor, b.actor) || collator.compare(a.code, b.code));
+      } else {
+        copy.sort((a, b) => collator.compare(a.code, b.code) || collator.compare(a.actor, b.actor));
+      }
+      return copy;
+    }
+
+    function createCodeLink(code) {
+      const link = document.createElement("a");
+      link.href = storageConfig.codeLinkBase + encodeURIComponent(code || "") + "/";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.className = "code-link";
+      link.textContent = code;
+      return link;
+    }
+
+    function render() {
+      const sortBy = sortSelect.value;
+      let data = sortEntries(loadEntries(), sortBy);
+      const q = currentQuery.trim().toLowerCase();
+
+      if (q) {
+        data = data.filter((item) =>
+          (item.code && item.code.toLowerCase().includes(q)) ||
+          (item.content && item.content.toLowerCase().includes(q)) ||
+          (item.actor && item.actor.toLowerCase().includes(q))
+        );
+      }
+
+      tbody.innerHTML = "";
+
+      for (const item of data) {
+        const tr = document.createElement("tr");
+        tr.dataset.code = item.code;
+
+        const tdCode = document.createElement("td");
+        const tdContent = document.createElement("td");
+        const tdActor = document.createElement("td");
+        const tdActions = document.createElement("td");
+
+        tdCode.appendChild(createCodeLink(item.code));
+        tdContent.textContent = item.content || "";
+        tdActor.textContent = item.actor || "";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn sm";
+        editBtn.textContent = "编辑";
+        editBtn.addEventListener("click", () => startEditEntry(item.code));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn sm";
+        delBtn.textContent = "删除";
+        delBtn.addEventListener("click", () => deleteEntry(item.code));
+
+        tdActions.appendChild(editBtn);
+        tdActions.appendChild(document.createTextNode(" "));
+        tdActions.appendChild(delBtn);
+
+        tr.appendChild(tdCode);
+        tr.appendChild(tdContent);
+        tr.appendChild(tdActor);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
+
+      if (data.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.className = "muted";
+        td.textContent = "暂无数据或无匹配结果，请先在上方输入内容。";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderInvalid() {
+      const data = loadInvalid();
+      invalidList.innerHTML = "";
+
+      if (data.length === 0) {
+        const li = document.createElement("li");
+        li.className = "muted";
+        li.textContent = "暂无无法识别的文本";
+        invalidList.appendChild(li);
+        return;
+      }
+
+      data.forEach((line, index) => {
+        const li = document.createElement("li");
+        li.dataset.index = String(index);
+
+        const span = document.createElement("span");
+        span.textContent = line;
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn sm";
+        editBtn.textContent = "编辑";
+        editBtn.addEventListener("click", () => startEditInvalid(index));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn sm";
+        delBtn.textContent = "删除";
+        delBtn.addEventListener("click", () => deleteInvalid(index));
+
+        li.appendChild(span);
+        li.appendChild(document.createTextNode(" "));
+        li.appendChild(editBtn);
+        li.appendChild(document.createTextNode(" "));
+        li.appendChild(delBtn);
+        invalidList.appendChild(li);
+      });
+    }
+
+    function parseAndStore(text) {
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        return;
+      }
+
+      const entries = loadEntries();
+      const invalids = loadInvalid();
+      let ok = 0;
+      let bad = 0;
+
+      for (const line of lines) {
+        const item = parseLine(line);
+        if (item) {
+          upsert(entries, item);
+          ok += 1;
+        } else {
+          invalids.push(line);
+          bad += 1;
+        }
+      }
+
+      saveEntries(entries);
+      saveInvalid(invalids);
+      render();
+      renderInvalid();
+
+      if (ok || bad) {
+        showToast(`已保存 ${ok} 条${bad ? `，无法识别 ${bad} 条` : ""}`);
+      }
+    }
+
+    function deleteEntry(code) {
+      const next = loadEntries().filter((item) => item.code.toLowerCase() !== (code || "").toLowerCase());
+      saveEntries(next);
+      render();
+      showToast("已删除 1 条");
+    }
+
+    function startEditEntry(code) {
+      const entries = loadEntries();
+      const item = entries.find((entry) => entry.code.toLowerCase() === (code || "").toLowerCase());
+      if (!item) {
+        return;
+      }
+
+      const tr = Array.from(tbody.querySelectorAll("tr")).find((row) => row.dataset.code === item.code);
+      if (!tr) {
+        return;
+      }
+
+      tr.innerHTML = "";
+
+      const tdCode = document.createElement("td");
+      const tdContent = document.createElement("td");
+      const tdActor = document.createElement("td");
+      const tdActions = document.createElement("td");
+
+      const inputCode = document.createElement("input");
+      inputCode.className = "input";
+      inputCode.value = item.code;
+
+      const inputContent = document.createElement("input");
+      inputContent.className = "input";
+      inputContent.value = item.content || "";
+
+      const inputActor = document.createElement("input");
+      inputActor.className = "input";
+      inputActor.value = item.actor || "";
+
+      tdCode.appendChild(inputCode);
+      tdContent.appendChild(inputContent);
+      tdActor.appendChild(inputActor);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn sm";
+      saveBtn.textContent = "保存";
+      saveBtn.addEventListener("click", () => {
+        const newCode = inputCode.value.trim();
+        const newContent = inputContent.value.trim();
+        const newActor = inputActor.value.trim();
+
+        if (!newCode || !newActor) {
+          showToast("代码与作者不能为空");
+          return;
+        }
+
+        const latestEntries = loadEntries();
+        const duplicate = latestEntries.find((entry) =>
+          entry.code.toLowerCase() === newCode.toLowerCase() && entry.code.toLowerCase() !== item.code.toLowerCase()
+        );
+
+        if (duplicate) {
+          showToast("代码重复，未保存");
+          return;
+        }
+
+        const index = latestEntries.findIndex((entry) => entry.code.toLowerCase() === item.code.toLowerCase());
+        if (index >= 0) {
+          latestEntries.splice(index, 1, { code: newCode, content: newContent, actor: newActor });
+        }
+
+        saveEntries(latestEntries);
+        render();
+        showToast("已保存");
+      });
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn sm";
+      cancelBtn.textContent = "取消";
+      cancelBtn.addEventListener("click", render);
+
+      tdActions.appendChild(saveBtn);
+      tdActions.appendChild(document.createTextNode(" "));
+      tdActions.appendChild(cancelBtn);
+
+      tr.appendChild(tdCode);
+      tr.appendChild(tdContent);
+      tr.appendChild(tdActor);
+      tr.appendChild(tdActions);
+    }
+
+    function deleteInvalid(index) {
+      const invalids = loadInvalid();
+      if (index < 0 || index >= invalids.length) {
+        return;
+      }
+
+      invalids.splice(index, 1);
+      saveInvalid(invalids);
+      renderInvalid();
+      showToast("已删除一条无法识别的文本");
+    }
+
+    function startEditInvalid(index) {
+      const invalids = loadInvalid();
+      const li = invalidList.querySelector(`li[data-index="${index}"]`);
+      if (!li || !invalids[index]) {
+        return;
+      }
+
+      li.innerHTML = "";
+
+      const input = document.createElement("input");
+      input.className = "input";
+      input.value = invalids[index];
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn sm";
+      saveBtn.textContent = "保存";
+      saveBtn.addEventListener("click", () => {
+        const value = input.value.trim();
+        if (!value) {
+          showToast("内容不能为空");
+          return;
+        }
+
+        invalids[index] = value;
+        saveInvalid(invalids);
+        renderInvalid();
+        showToast("已更新无法识别的文本");
+      });
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn sm";
+      cancelBtn.textContent = "取消";
+      cancelBtn.addEventListener("click", renderInvalid);
+
+      li.appendChild(input);
+      li.appendChild(document.createTextNode(" "));
+      li.appendChild(saveBtn);
+      li.appendChild(document.createTextNode(" "));
+      li.appendChild(cancelBtn);
+    }
+
+    inputBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        parseAndStore(inputBox.value);
+        inputBox.value = "";
+      }
+    });
+
+    inputBox.addEventListener("blur", () => {
+      if (inputBox.value.trim()) {
+        parseAndStore(inputBox.value);
+        inputBox.value = "";
+      }
+    });
+
+    sortSelect.addEventListener("change", render);
+    searchBtn.addEventListener("click", () => {
+      currentQuery = searchBox.value || "";
+      render();
+    });
+    clearSearchBtn.addEventListener("click", () => {
+      currentQuery = "";
+      searchBox.value = "";
+      render();
+    });
+    searchBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        currentQuery = searchBox.value || "";
+        render();
+      }
+    });
+
+    render();
+    renderInvalid();
+  </script>
+</body>
+
+</html>

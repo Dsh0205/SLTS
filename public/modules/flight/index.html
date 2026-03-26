@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>飞机航班查询</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #0f1216;
+      --muted: #6b7280;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --primary: #111827;
+      --primary-contrast: #ffffff;
+      --accent: #ff69b4;
+    }
+
+    .dark {
+      --bg: #0e1117;
+      --text: #e5e7eb;
+      --muted: #a1a1aa;
+      --card: #151822;
+      --border: #2a2f3a;
+      --primary: #3b82f6;
+      --primary-contrast: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .site-title {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .site-subtitle {
+      margin: 6px 0 16px;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform .05s ease, box-shadow .2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .06);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    .btn.primary {
+      background: var(--primary);
+      color: var(--primary-contrast);
+      border-color: var(--primary);
+    }
+
+    .btn.search {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .btn.sm {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    main {
+      padding: 24px 0;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .04);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 22px;
+    }
+
+    .list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-2px);
+    }
+
+    form .row,
+    .row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .input,
+    .textarea,
+    .select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .input::placeholder,
+    .textarea::placeholder {
+      color: #9ca3af;
+    }
+
+    .search-input {
+      background: #f3f4f6;
+      color: #0f1216;
+      border: 1px solid #d1d5db;
+      max-width: 420px;
+      flex: 1 1 260px;
+    }
+
+    .textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    .table th,
+    .table td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .code-link {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .code-link:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 720px) {
+      .container {
+        padding: 16px;
+      }
+
+      .card {
+        padding: 18px;
+      }
+
+      .table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1 class="site-title">AIRPORT CHECK</h1>
+      <p class="site-subtitle">输入格式：代码/内容/作者</p>
+      <nav class="actions">
+        <button id="toggle-theme" class="btn primary">夜晚模式/白天模式</button>
+        <button id="say-hello" class="btn">功能按钮</button>
+        <a class="btn" href="./漫画查询.html">漫画按钮</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <section class="card">
+        <h2>开始使用</h2>
+        <p>每行输入一条数据，格式为“代码/内容/作者”，按回车或离开输入框后自动保存并显示在下面。</p>
+        <ul class="list">
+          <li>支持搜索、排序、编辑、删除</li>
+          <li>代码列会自动生成跳转链接</li>
+          <li>无法识别的文本会单独列在下方</li>
+        </ul>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <h2>输入文本</h2>
+        <p class="muted">每行使用“代码/内容/作者”格式，例如：CA123/上海到北京/张三</p>
+        <div class="row">
+          <textarea id="entry-input" class="textarea" placeholder="在此粘贴或输入多行：代码/内容/作者"></textarea>
+        </div>
+        <div class="controls">
+          <label for="sort-by" class="muted">排序方式</label>
+          <select id="sort-by" class="select" style="max-width:220px">
+            <option value="actor">按作者名称</option>
+            <option value="code">按代码字母</option>
+          </select>
+        </div>
+        <div class="controls">
+          <label for="search-box" class="muted">搜索</label>
+          <input id="search-box" class="input search-input" placeholder="输入代码/内容/作者关键字">
+          <button id="search-btn" class="btn search">搜索</button>
+          <button id="clear-search" class="btn">清除</button>
+        </div>
+        <table class="table" aria-label="条目列表">
+          <thead>
+            <tr>
+              <th style="width:22%">代码</th>
+              <th>内容</th>
+              <th style="width:22%">作者</th>
+              <th style="width:160px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="entry-tbody"></tbody>
+        </table>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <h2>无法识别的文本</h2>
+        <ul id="invalid-list" class="list"></ul>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script>
+    const storageConfig = {
+      entriesKey: "entries-v1",
+      invalidKey: "entries-invalid-v1",
+      codeLinkBase: "https://missav.ws/cn/search/"
+    };
+
+    const root = document.documentElement;
+    const themeKey = "site-theme";
+    const saved = localStorage.getItem(themeKey);
+    if (saved === "dark") {
+      root.classList.add("dark");
+    }
+
+    const toggleBtn = document.getElementById("toggle-theme");
+    const helloBtn = document.getElementById("say-hello");
+    const toast = document.getElementById("toast");
+    const inputBox = document.getElementById("entry-input");
+    const sortSelect = document.getElementById("sort-by");
+    const tbody = document.getElementById("entry-tbody");
+    const searchBox = document.getElementById("search-box");
+    const searchBtn = document.getElementById("search-btn");
+    const clearSearchBtn = document.getElementById("clear-search");
+    const invalidList = document.getElementById("invalid-list");
+
+    let currentQuery = "";
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      root.classList.toggle("dark");
+      const mode = root.classList.contains("dark") ? "dark" : "light";
+      localStorage.setItem(themeKey, mode);
+      showToast(mode === "dark" ? "已切换到深色模式" : "已切换到浅色模式");
+    });
+
+    helloBtn.addEventListener("click", () => {
+      showToast("欢迎使用当前页面");
+    });
+
+    function loadEntries() {
+      try {
+        const raw = localStorage.getItem(storageConfig.entriesKey);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveEntries(arr) {
+      localStorage.setItem(storageConfig.entriesKey, JSON.stringify(arr));
+    }
+
+    function loadInvalid() {
+      try {
+        const raw = localStorage.getItem(storageConfig.invalidKey);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveInvalid(arr) {
+      localStorage.setItem(storageConfig.invalidKey, JSON.stringify(arr));
+    }
+
+    function parseLine(line) {
+      const parts = line.split("/").map((item) => item.trim());
+      if (parts.length < 3) {
+        return null;
+      }
+
+      const code = parts[0];
+      const content = parts[1];
+      const actor = parts.slice(2).join("/");
+
+      if (!code || !actor) {
+        return null;
+      }
+
+      return { code, content, actor };
+    }
+
+    function upsert(arr, entry) {
+      const idx = arr.findIndex((item) => item.code.toLowerCase() === entry.code.toLowerCase());
+      if (idx >= 0) {
+        arr[idx] = { ...arr[idx], ...entry };
+      } else {
+        arr.push(entry);
+      }
+    }
+
+    function sortEntries(arr, by) {
+      const collator = new Intl.Collator("zh-CN", { sensitivity: "base", numeric: true });
+      const copy = arr.slice();
+      if (by === "actor") {
+        copy.sort((a, b) => collator.compare(a.actor, b.actor) || collator.compare(a.code, b.code));
+      } else {
+        copy.sort((a, b) => collator.compare(a.code, b.code) || collator.compare(a.actor, b.actor));
+      }
+      return copy;
+    }
+
+    function createCodeLink(code) {
+      const link = document.createElement("a");
+      link.href = storageConfig.codeLinkBase + encodeURIComponent(code || "");
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.className = "code-link";
+      link.textContent = code;
+      return link;
+    }
+
+    function render() {
+      const sortBy = sortSelect.value;
+      let data = sortEntries(loadEntries(), sortBy);
+      const q = currentQuery.trim().toLowerCase();
+
+      if (q) {
+        data = data.filter((item) =>
+          (item.code && item.code.toLowerCase().includes(q)) ||
+          (item.content && item.content.toLowerCase().includes(q)) ||
+          (item.actor && item.actor.toLowerCase().includes(q))
+        );
+      }
+
+      tbody.innerHTML = "";
+
+      for (const item of data) {
+        const tr = document.createElement("tr");
+        tr.dataset.code = item.code;
+
+        const tdCode = document.createElement("td");
+        const tdContent = document.createElement("td");
+        const tdActor = document.createElement("td");
+        const tdActions = document.createElement("td");
+
+        tdCode.appendChild(createCodeLink(item.code));
+        tdContent.textContent = item.content || "";
+        tdActor.textContent = item.actor || "";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn sm";
+        editBtn.textContent = "编辑";
+        editBtn.addEventListener("click", () => startEditEntry(item.code));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn sm";
+        delBtn.textContent = "删除";
+        delBtn.addEventListener("click", () => deleteEntry(item.code));
+
+        tdActions.appendChild(editBtn);
+        tdActions.appendChild(document.createTextNode(" "));
+        tdActions.appendChild(delBtn);
+
+        tr.appendChild(tdCode);
+        tr.appendChild(tdContent);
+        tr.appendChild(tdActor);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
+
+      if (data.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.className = "muted";
+        td.textContent = "暂无数据或无匹配结果，请在上方输入内容或调整搜索条件。";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderInvalid() {
+      const data = loadInvalid();
+      invalidList.innerHTML = "";
+
+      if (data.length === 0) {
+        const li = document.createElement("li");
+        li.className = "muted";
+        li.textContent = "暂无无法识别的文本";
+        invalidList.appendChild(li);
+        return;
+      }
+
+      data.forEach((line, index) => {
+        const li = document.createElement("li");
+        li.dataset.index = String(index);
+
+        const span = document.createElement("span");
+        span.textContent = line;
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn sm";
+        editBtn.textContent = "编辑";
+        editBtn.addEventListener("click", () => startEditInvalid(index));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn sm";
+        delBtn.textContent = "删除";
+        delBtn.addEventListener("click", () => deleteInvalid(index));
+
+        li.appendChild(span);
+        li.appendChild(document.createTextNode(" "));
+        li.appendChild(editBtn);
+        li.appendChild(document.createTextNode(" "));
+        li.appendChild(delBtn);
+        invalidList.appendChild(li);
+      });
+    }
+
+    function parseAndStore(text) {
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        return;
+      }
+
+      const entries = loadEntries();
+      const invalids = loadInvalid();
+      let ok = 0;
+      let bad = 0;
+
+      for (const line of lines) {
+        const item = parseLine(line);
+        if (item) {
+          upsert(entries, item);
+          ok += 1;
+        } else {
+          invalids.push(line);
+          bad += 1;
+        }
+      }
+
+      saveEntries(entries);
+      saveInvalid(invalids);
+      render();
+      renderInvalid();
+
+      if (ok || bad) {
+        showToast(`已保存 ${ok} 条${bad ? `，无法识别 ${bad} 条` : ""}`);
+      }
+    }
+
+    function deleteEntry(code) {
+      const next = loadEntries().filter((item) => item.code.toLowerCase() !== (code || "").toLowerCase());
+      saveEntries(next);
+      render();
+      showToast("已删除 1 条");
+    }
+
+    function startEditEntry(code) {
+      const entries = loadEntries();
+      const item = entries.find((entry) => entry.code.toLowerCase() === (code || "").toLowerCase());
+      if (!item) {
+        return;
+      }
+
+      const tr = Array.from(tbody.querySelectorAll("tr")).find((row) => row.dataset.code === item.code);
+      if (!tr) {
+        return;
+      }
+
+      tr.innerHTML = "";
+
+      const tdCode = document.createElement("td");
+      const tdContent = document.createElement("td");
+      const tdActor = document.createElement("td");
+      const tdActions = document.createElement("td");
+
+      const inputCode = document.createElement("input");
+      inputCode.className = "input";
+      inputCode.value = item.code;
+
+      const inputContent = document.createElement("input");
+      inputContent.className = "input";
+      inputContent.value = item.content || "";
+
+      const inputActor = document.createElement("input");
+      inputActor.className = "input";
+      inputActor.value = item.actor || "";
+
+      tdCode.appendChild(inputCode);
+      tdContent.appendChild(inputContent);
+      tdActor.appendChild(inputActor);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn sm";
+      saveBtn.textContent = "保存";
+      saveBtn.addEventListener("click", () => {
+        const newCode = inputCode.value.trim();
+        const newContent = inputContent.value.trim();
+        const newActor = inputActor.value.trim();
+
+        if (!newCode || !newActor) {
+          showToast("代码与作者不能为空");
+          return;
+        }
+
+        const latestEntries = loadEntries();
+        const duplicate = latestEntries.find((entry) =>
+          entry.code.toLowerCase() === newCode.toLowerCase() && entry.code.toLowerCase() !== item.code.toLowerCase()
+        );
+
+        if (duplicate) {
+          showToast("代码重复，未保存");
+          return;
+        }
+
+        const index = latestEntries.findIndex((entry) => entry.code.toLowerCase() === item.code.toLowerCase());
+        if (index >= 0) {
+          latestEntries.splice(index, 1, { code: newCode, content: newContent, actor: newActor });
+        }
+
+        saveEntries(latestEntries);
+        render();
+        showToast("已保存");
+      });
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn sm";
+      cancelBtn.textContent = "取消";
+      cancelBtn.addEventListener("click", render);
+
+      tdActions.appendChild(saveBtn);
+      tdActions.appendChild(document.createTextNode(" "));
+      tdActions.appendChild(cancelBtn);
+
+      tr.appendChild(tdCode);
+      tr.appendChild(tdContent);
+      tr.appendChild(tdActor);
+      tr.appendChild(tdActions);
+    }
+
+    function deleteInvalid(index) {
+      const invalids = loadInvalid();
+      if (index < 0 || index >= invalids.length) {
+        return;
+      }
+
+      invalids.splice(index, 1);
+      saveInvalid(invalids);
+      renderInvalid();
+      showToast("已删除一条无法识别的文本");
+    }
+
+    function startEditInvalid(index) {
+      const invalids = loadInvalid();
+      const li = invalidList.querySelector(`li[data-index="${index}"]`);
+      if (!li || !invalids[index]) {
+        return;
+      }
+
+      li.innerHTML = "";
+
+      const input = document.createElement("input");
+      input.className = "input";
+      input.value = invalids[index];
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn sm";
+      saveBtn.textContent = "保存";
+      saveBtn.addEventListener("click", () => {
+        const value = input.value.trim();
+        if (!value) {
+          showToast("内容不能为空");
+          return;
+        }
+
+        invalids[index] = value;
+        saveInvalid(invalids);
+        renderInvalid();
+        showToast("已更新无法识别的文本");
+      });
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn sm";
+      cancelBtn.textContent = "取消";
+      cancelBtn.addEventListener("click", renderInvalid);
+
+      li.appendChild(input);
+      li.appendChild(document.createTextNode(" "));
+      li.appendChild(saveBtn);
+      li.appendChild(document.createTextNode(" "));
+      li.appendChild(cancelBtn);
+    }
+
+    inputBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        parseAndStore(inputBox.value);
+        inputBox.value = "";
+      }
+    });
+
+    inputBox.addEventListener("blur", () => {
+      if (inputBox.value.trim()) {
+        parseAndStore(inputBox.value);
+        inputBox.value = "";
+      }
+    });
+
+    sortSelect.addEventListener("change", render);
+    searchBtn.addEventListener("click", () => {
+      currentQuery = searchBox.value || "";
+      render();
+    });
+    clearSearchBtn.addEventListener("click", () => {
+      currentQuery = "";
+      searchBox.value = "";
+      render();
+    });
+    searchBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        currentQuery = searchBox.value || "";
+        render();
+      }
+    });
+
+    render();
+    renderInvalid();
+  </script>
+</body>
+
+</html>
