@@ -1,4 +1,4 @@
-function resolveDesktopBridge() {
+export function resolveDesktopBridge() {
   if (window.shanlicDesktop?.isElectron) {
     return window.shanlicDesktop;
   }

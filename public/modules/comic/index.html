@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>漫画查询</title>
+  <link rel="stylesheet" href="../shared/reveal.css">
   <style>
     :root {
       --bg: #eafcff;
@@ -187,82 +188,6 @@
       box-shadow:
         0 20px 48px rgba(36, 130, 158, 0.16),
         0 0 0 1px rgba(89, 217, 255, 0.08);
-    }
-
-    .eyebrow,
-    .site-title,
-    .actions > *,
-    .hero-card,
-    .grid > .card {
-      opacity: 0;
-      transform: translateY(0);
-      filter: blur(0);
-    }
-
-    .eyebrow {
-      animation: module-rise-in 0.42s ease forwards;
-      animation-delay: 0.02s;
-    }
-
-    .site-title {
-      animation: module-rise-in 0.48s ease forwards;
-      animation-delay: 0.1s;
-    }
-
-    .actions > * {
-      animation: module-bounce-in 0.54s cubic-bezier(0.2, 0.9, 0.2, 1.1) forwards;
-    }
-
-    .actions > *:nth-child(1) { animation-delay: 0.18s; }
-    .actions > *:nth-child(2) { animation-delay: 0.26s; }
-
-    .hero-card {
-      animation: module-rise-in 0.54s ease forwards;
-      animation-delay: 0.18s;
-    }
-
-    .grid > .card:nth-child(1) {
-      animation: module-rise-in 0.56s ease forwards;
-      animation-delay: 0.28s;
-    }
-
-    .grid > .card:nth-child(2) {
-      animation: module-rise-in 0.56s ease forwards;
-      animation-delay: 0.4s;
-    }
-
-    @keyframes module-rise-in {
-      0% {
-        opacity: 0;
-        transform: translateY(24px) scale(0.985);
-        filter: blur(6px);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-      }
-    }
-
-    @keyframes module-bounce-in {
-      0% {
-        opacity: 0;
-        transform: translateY(26px) scale(0.9);
-        filter: blur(6px);
-      }
-      60% {
-        opacity: 1;
-        transform: translateY(-4px) scale(1.04);
-        filter: blur(0);
-      }
-      80% {
-        transform: translateY(2px) scale(0.99);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-      }
     }
 
     .btn {
@@ -450,12 +375,12 @@
   <header class="site-header">
     <div class="container header-inner">
       <div>
-        <div class="eyebrow">Comic Mode</div>
-        <h1 class="site-title">漫画查询</h1>
+        <div class="eyebrow module-reveal delay-1">Comic Mode</div>
+        <h1 class="site-title module-reveal delay-2">漫画查询</h1>
       </div>
       <nav class="actions">
-        <a class="btn" href="./飞机航班查询.html">返回主页</a>
-        <button id="say-hello" class="btn primary">提示按钮</button>
+        <a class="btn module-reveal is-bounce delay-3" href="./飞机航班查询.html">返回主页</a>
+        <button id="say-hello" class="btn primary module-reveal is-bounce delay-4">提示按钮</button>
       </nav>
     </div>
   </header>
@@ -463,7 +388,7 @@
   <main>
     <section class="hero">
       <div class="container">
-        <div class="hero-card">
+        <div class="hero-card module-reveal delay-4">
           <h2>橙黑风格漫画页</h2>
           <p class="site-subtitle">输入格式仍然是“代码/内容/作者”。保存后会显示在下方，代码列会变成超链接，点击后跳转到 `https://18comic.vip/album/检测出的代码/`。</p>
         </div>
@@ -471,7 +396,7 @@
     </section>
 
     <section class="container grid">
-      <section class="card">
+      <section class="card module-reveal delay-5">
         <h2>输入文本</h2>
         <p class="muted">每行一条，例如：123456/作品标题/作者名</p>
         <div class="row">
@@ -505,7 +430,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card module-reveal delay-6">
         <h2>无法识别的文本</h2>
         <ul id="invalid-list" class="list"></ul>
       </section>

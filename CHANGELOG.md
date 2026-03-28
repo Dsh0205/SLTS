@@ -43,6 +43,11 @@
 ### 文档
 - 补充 `docs/release-1.1.0.md` 版本说明文档。
 
+### 代码整理
+- 抽出 `public/modules/shared/reveal.css`，统一管理多个模块页重复的进场动画样式。
+- 精简 `flight`、`comic`、`lottery` 页内重复动画代码，改为共享类名驱动。
+- 整理 `src/lib/modules.ts` 模块定义结构，减少重复配置样板。
+- 将 `src/components/PortalScene.vue` 继续拆分为设置面板、轨道场景和动画组合逻辑，降低首页入口组件体积。
 ## 0.0.0 - 2026-03-27
 
 ### 优化

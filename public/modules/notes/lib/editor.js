@@ -1,4 +1,4 @@
-function replaceLinePrefix(input, prefix, matcher, onChange) {
+export function replaceLinePrefix(input, prefix, matcher, onChange) {
   const start = input.selectionStart;
   const end = input.selectionEnd;
   const value = input.value;
@@ -21,11 +21,11 @@ function replaceLinePrefix(input, prefix, matcher, onChange) {
   onChange?.();
 }
 
-function insertAtLineStart(input, text, onChange) {
+export function insertAtLineStart(input, text, onChange) {
   replaceLinePrefix(input, text, null, onChange);
 }
 
-function insertAtRange(input, text, start, end, onChange) {
+export function insertAtRange(input, text, start, end, onChange) {
   const value = input.value;
   input.value = value.slice(0, start) + text + value.slice(end);
   input.selectionStart = input.selectionEnd = start + text.length;
@@ -33,7 +33,7 @@ function insertAtRange(input, text, start, end, onChange) {
   onChange?.();
 }
 
-function insertAtCursor(input, text, selectStartOffset = 0, selectEndOffset = 0, onChange) {
+export function insertAtCursor(input, text, selectStartOffset = 0, selectEndOffset = 0, onChange) {
   const start = input.selectionStart;
   const end = input.selectionEnd;
   const value = input.value;
@@ -51,7 +51,7 @@ function insertAtCursor(input, text, selectStartOffset = 0, selectEndOffset = 0,
   onChange?.();
 }
 
-function applyHeadingLevel(input, level, onChange) {
+export function applyHeadingLevel(input, level, onChange) {
   input.focus();
   replaceLinePrefix(input, `${'#'.repeat(level)} `, /^(#{1,6}\s+)/, onChange);
 }

@@ -1,3 +1,13 @@
+import { applyHeadingLevel as applyHeadingLevelToInput } from './lib/editor.js'
+import {
+  createEmptyNote,
+  getSortedNotes as getSortedNotesFromStorage,
+  hydrateNotes as hydrateNotesFromStorage,
+  persistNotes as persistNotesToStorage,
+  readStoredNotes,
+} from './lib/storage.js'
+import { findNoteById as findNoteByIdInTree } from './lib/tree.js'
+
 document.addEventListener('DOMContentLoaded', async () => {
   const STORAGE_KEY = 'shanlic_notes';
   const ACTIVE_NOTE_KEY = 'shanlic_notes_widget_active_id';
@@ -19,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   desktopBridge?.reloadMirroredStorage?.();
 
-  let notes = hydrateNotes(readStoredNotes());
+  let notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
   let activeNoteId = resolveInitialNoteId();
   let autosaveTimer = 0;
   let suppressInputSave = false;
@@ -39,11 +49,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveCurrentNote({ announce: true });
     });
 
-    pinToggleBtn?.addEventListener('click', () => {
-      togglePinState();
-    });
-    pinStatusBtn?.addEventListener('click', () => {
-      togglePinState();
+    [pinToggleBtn, pinStatusBtn].forEach((button) => {
+      button?.addEventListener('click', () => {
+        togglePinState();
+      });
     });
 
     notePicker.addEventListener('change', (event) => {
@@ -136,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const result = await desktopBridge.setFloatingNotesPinState(nextPinned);
       isPinned = Boolean(result?.enabled);
       updatePinStateUI(isPinned);
-      saveStatus.textContent = isPinned ? '悬浮窗已固定' : '悬浮窗取消固定';
+      saveStatus.textContent = isPinned ? '悬浮窗已固定' : '悬浮窗已取消固定';
     } catch (error) {
       console.error(error);
       saveStatus.textContent = '固定状态切换失败';
@@ -147,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     pinToggleBtn?.classList.toggle('is-active', enabled);
     pinStatusBtn?.classList.toggle('is-active', enabled);
     if (pinStatusLabel) {
-      pinStatusLabel.textContent = enabled ? '固定中' : '未固定';
+      pinStatusLabel.textContent = enabled ? '已固定' : '未固定';
     }
     if (pinToggleBtn) {
       pinToggleBtn.title = enabled ? '点击取消固定' : '点击固定悬浮窗';
@@ -163,31 +172,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     autosaveTimer = window.setTimeout(() => {
       saveCurrentNote();
     }, AUTOSAVE_DELAY);
-  }
-
-  function readStoredNotes() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  function hydrateNotes(list) {
-    if (!Array.isArray(list)) return [];
-
-    return list.map((note) => ({
-      id: note.id || createNoteId(),
-      title: typeof note.title === 'string' ? note.title : '',
-      content: typeof note.content === 'string' ? note.content : '',
-      lastModified: typeof note.lastModified === 'string' ? note.lastModified : '未保存',
-      updatedAt: Number.isFinite(note.updatedAt) ? note.updatedAt : Date.parse(note.lastModified) || 0,
-      children: hydrateNotes(note.children || []),
-    }));
-  }
-
-  function createNoteId() {
-    return Date.now() + Math.floor(Math.random() * 10000);
   }
 
   function resolveInitialNoteId() {
@@ -237,12 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function getSortedNotes(list) {
-    return [...list].sort((a, b) => getUpdatedAt(b) - getUpdatedAt(a));
-  }
-
-  function getUpdatedAt(note) {
-    if (Number.isFinite(note.updatedAt)) return note.updatedAt;
-    return Date.parse(note.lastModified) || 0;
+    return getSortedNotesFromStorage(list);
   }
 
   function renderPicker() {
@@ -252,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     flattened.forEach((item) => {
       const option = document.createElement('option');
       option.value = String(item.id);
-      option.textContent = `${'  '.repeat(item.depth)}${item.depth > 0 ? '└ ' : ''}${item.title}`;
+      option.textContent = `${'  '.repeat(item.depth)}${item.depth > 0 ? '• ' : ''}${item.title}`;
       notePicker.appendChild(option);
     });
 
@@ -262,14 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function findNoteById(id, list = notes) {
-    for (const note of list) {
-      if (note.id === id) return note;
-      if (note.children.length > 0) {
-        const found = findNoteById(id, note.children);
-        if (found) return found;
-      }
-    }
-    return null;
+    return findNoteByIdInTree(id, list);
   }
 
   function selectNote(id, options = {}) {
@@ -295,18 +267,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function createNote() {
     saveCurrentNote();
 
-    const now = new Date();
-    const newNote = {
-      id: createNoteId(),
-      title: '',
-      content: '',
-      lastModified: now.toLocaleString(),
-      updatedAt: now.getTime(),
-      children: [],
-    };
-
+    const newNote = createEmptyNote();
     notes.unshift(newNote);
-    persistNotes();
+    persistCurrentNotes();
     activeNoteId = newNote.id;
     localStorage.setItem(ACTIVE_NOTE_KEY, String(newNote.id));
     renderPicker();
@@ -316,13 +279,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     noteTitleInput.focus();
   }
 
-  function persistNotes() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  function persistCurrentNotes() {
+    persistNotesToStorage(STORAGE_KEY, notes);
   }
 
   function syncFromStorage() {
     desktopBridge?.reloadMirroredStorage?.();
-    notes = hydrateNotes(readStoredNotes());
+    notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
     renderPicker();
 
     if (activeNoteId && findNoteById(activeNoteId)) {
@@ -338,15 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let note = activeNoteId ? findNoteById(activeNoteId) : null;
     if (!note) {
-      const now = new Date();
-      note = {
-        id: createNoteId(),
-        title: '',
-        content: '',
-        lastModified: now.toLocaleString(),
-        updatedAt: now.getTime(),
-        children: [],
-      };
+      note = createEmptyNote();
       notes.unshift(note);
       activeNoteId = note.id;
       localStorage.setItem(ACTIVE_NOTE_KEY, String(note.id));
@@ -357,7 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     note.lastModified = new Date().toLocaleString();
     note.updatedAt = Date.now();
 
-    persistNotes();
+    persistCurrentNotes();
     renderPicker();
     notePicker.value = String(note.id);
     saveNoteBtn.classList.remove('is-primary');
@@ -367,30 +322,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function applyHeadingLevel(level) {
-    noteContentInput.focus();
-    replaceLinePrefix(noteContentInput, `${'#'.repeat(level)} `, /^(#{1,6}\s+)/);
-    handleDraftInput();
-  }
-
-  function replaceLinePrefix(input, prefix, matcher) {
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const value = input.value;
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-    const lineEnd = value.indexOf('\n', end);
-    const safeLineEnd = lineEnd === -1 ? value.length : lineEnd;
-    const lineText = value.slice(lineStart, safeLineEnd);
-    const matchedPrefix = matcher ? lineText.match(matcher)?.[0] || '' : '';
-    const nextLineText = matchedPrefix ? prefix + lineText.slice(matchedPrefix.length) : prefix + lineText;
-
-    input.value = value.slice(0, lineStart) + nextLineText + value.slice(safeLineEnd);
-
-    const selectionOffset = matcher && matchedPrefix
-      ? Math.max(0, start - lineStart - matchedPrefix.length)
-      : start - lineStart;
-    const nextCursor = lineStart + prefix.length + selectionOffset;
-
-    input.selectionStart = input.selectionEnd = nextCursor;
-    input.focus();
+    applyHeadingLevelToInput(noteContentInput, level, handleDraftInput);
   }
 });

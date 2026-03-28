@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>飞机航班查询</title>
+  <link rel="stylesheet" href="../shared/reveal.css">
   <style>
     :root {
       --bg: #fff2f4;
@@ -160,75 +161,6 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, .04);
     }
 
-    .site-title,
-    .site-subtitle,
-    .actions > *,
-    main .card {
-      opacity: 0;
-      transform: translateY(0);
-      filter: blur(0);
-    }
-
-    .site-title {
-      animation: module-rise-in 0.48s ease forwards;
-      animation-delay: 0.04s;
-    }
-
-    .site-subtitle {
-      animation: module-rise-in 0.48s ease forwards;
-      animation-delay: 0.12s;
-    }
-
-    .actions > * {
-      animation: module-bounce-in 0.54s cubic-bezier(0.2, 0.9, 0.2, 1.1) forwards;
-    }
-
-    .actions > *:nth-child(1) { animation-delay: 0.18s; }
-    .actions > *:nth-child(2) { animation-delay: 0.26s; }
-    .actions > *:nth-child(3) { animation-delay: 0.34s; }
-
-    main .card {
-      animation: module-rise-in 0.52s ease forwards;
-    }
-
-    main .card:nth-of-type(1) { animation-delay: 0.2s; }
-    main .card:nth-of-type(2) { animation-delay: 0.3s; }
-    main .card:nth-of-type(3) { animation-delay: 0.4s; }
-
-    @keyframes module-rise-in {
-      0% {
-        opacity: 0;
-        transform: translateY(22px) scale(0.985);
-        filter: blur(6px);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-      }
-    }
-
-    @keyframes module-bounce-in {
-      0% {
-        opacity: 0;
-        transform: translateY(24px) scale(0.92);
-        filter: blur(6px);
-      }
-      62% {
-        opacity: 1;
-        transform: translateY(-4px) scale(1.04);
-        filter: blur(0);
-      }
-      82% {
-        transform: translateY(2px) scale(0.99);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-      }
-    }
-
     .card h2 {
       margin-top: 0;
       font-size: 22px;
@@ -351,19 +283,19 @@
 <body>
   <header class="site-header">
     <div class="container">
-      <h1 class="site-title">AIRPORT CHECK</h1>
-      <p class="site-subtitle">输入格式：代码/内容/作者</p>
+      <h1 class="site-title module-reveal delay-1">AIRPORT CHECK</h1>
+      <p class="site-subtitle module-reveal delay-2">输入格式：代码/内容/作者</p>
       <nav class="actions">
-        <button id="toggle-theme" class="btn primary">夜晚模式/白天模式</button>
-        <button id="say-hello" class="btn">功能按钮</button>
-        <a class="btn" href="../comic/index.html">漫画按钮</a>
+        <button id="toggle-theme" class="btn primary module-reveal is-bounce delay-3">夜晚模式/白天模式</button>
+        <button id="say-hello" class="btn module-reveal is-bounce delay-4">功能按钮</button>
+        <a class="btn module-reveal is-bounce delay-5" href="../comic/index.html">漫画按钮</a>
       </nav>
     </div>
   </header>
 
   <main>
     <div class="container">
-      <section class="card">
+      <section class="card module-reveal delay-4">
         <h2>开始使用</h2>
         <p>每行输入一条数据，格式为“代码/内容/作者”，按回车或离开输入框后自动保存并显示在下面。</p>
         <ul class="list">
@@ -373,7 +305,7 @@
         </ul>
       </section>
 
-      <section class="card" style="margin-top:16px">
+      <section class="card module-reveal delay-5" style="margin-top:16px">
         <h2>输入文本</h2>
         <p class="muted">每行使用“代码/内容/作者”格式，例如：CA123/上海到北京/张三</p>
         <div class="row">
@@ -405,7 +337,7 @@
         </table>
       </section>
 
-      <section class="card" style="margin-top:16px">
+      <section class="card module-reveal delay-6" style="margin-top:16px">
         <h2>无法识别的文本</h2>
         <ul id="invalid-list" class="list"></ul>
       </section>

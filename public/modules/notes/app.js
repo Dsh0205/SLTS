@@ -1,9 +1,32 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+import { resolveDesktopBridge } from './lib/bridge.js'
+import {
+  applyHeadingLevel as applyHeadingLevelToInput,
+  insertAtCursor as insertAtCursorInInput,
+  insertAtLineStart as insertAtLineStartInInput,
+  insertAtRange as insertAtRangeInInput,
+  replaceLinePrefix as replaceLinePrefixInInput,
+} from './lib/editor.js'
+import {
+  createEmptyNote,
+  getSortedNotes as getSortedNotesFromStorage,
+  hydrateNotes as hydrateNotesFromStorage,
+  persistNotes,
+  readStoredNotes,
+} from './lib/storage.js'
+import {
+  deleteNoteById as deleteNoteByIdInTree,
+  expandPathToNote as expandPathToNoteInTree,
+  findNoteById as findNoteByIdInTree,
+  flattenNotes as flattenNotesInTree,
+  noteTreeContainsId as noteTreeContainsIdInTree,
+} from './lib/tree.js'
+
+document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY = 'shanlic_notes';
   const desktopBridge = resolveDesktopBridge();
   const markedInstance = window.marked;
 
-  let notes = hydrateNotes(readStoredNotes(STORAGE_KEY));
+  let notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
   let activeNoteId = null;
   let draftNoteId = null;
   let draftTitle = '';
@@ -83,6 +106,7 @@
   const btnWidescreen = document.getElementById('btn-widescreen');
 
   const expandedNoteIds = new Set();
+  const handleMainEditorChange = () => handleDraftInput('main');
 
   marked.setOptions({
     headerIds: true,
@@ -426,30 +450,6 @@
     }
   });
 
-  function readStoredNotes() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  function resolveDesktopBridge() {
-    if (window.shanlicDesktop?.isElectron) {
-      return window.shanlicDesktop;
-    }
-
-    try {
-      if (window.parent && window.parent !== window && window.parent.shanlicDesktop?.isElectron) {
-        return window.parent.shanlicDesktop;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
-  }
-
   function syncLauncherButton() {
     if (!editorLauncher) return;
 
@@ -482,34 +482,12 @@
     toggleSideEditor();
   }
 
-  function hydrateNotes(list) {
-    if (!Array.isArray(list)) return [];
-
-    return list.map((note) => ({
-      id: note.id || createNoteId(),
-      title: typeof note.title === 'string' ? note.title : '',
-      content: typeof note.content === 'string' ? note.content : '',
-      lastModified: typeof note.lastModified === 'string' ? note.lastModified : '未保存',
-      updatedAt: Number.isFinite(note.updatedAt) ? note.updatedAt : Date.parse(note.lastModified) || 0,
-      children: hydrateNotes(note.children || []),
-    }));
-  }
-
   function saveNotes() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-  }
-
-  function createNoteId() {
-    return Date.now() + Math.floor(Math.random() * 10000);
+    persistNotes(STORAGE_KEY, notes);
   }
 
   function getSortedNotes(list) {
-    return [...list].sort((a, b) => getNoteUpdatedAt(b) - getNoteUpdatedAt(a));
-  }
-
-  function getNoteUpdatedAt(note) {
-    if (Number.isFinite(note.updatedAt)) return note.updatedAt;
-    return Date.parse(note.lastModified) || 0;
+    return getSortedNotesFromStorage(list);
   }
 
   function isEditorVisible() {
@@ -666,46 +644,19 @@
   }
 
   function findNoteById(id, list = notes) {
-    for (const note of list) {
-      if (note.id === id) return note;
-      if (note.children.length > 0) {
-        const found = findNoteById(id, note.children);
-        if (found) return found;
-      }
-    }
-    return null;
+    return findNoteByIdInTree(id, list);
   }
 
   function deleteNoteById(id, list = notes) {
-    for (let index = 0; index < list.length; index += 1) {
-      if (list[index].id === id) {
-        list.splice(index, 1);
-        return true;
-      }
-
-      if (deleteNoteById(id, list[index].children)) {
-        return true;
-      }
-    }
-
-    return false;
+    return deleteNoteByIdInTree(id, list);
   }
 
   function noteTreeContainsId(note, id) {
-    if (!note || id === null) return false;
-    if (note.id === id) return true;
-    return note.children.some((child) => noteTreeContainsId(child, id));
+    return noteTreeContainsIdInTree(note, id);
   }
 
   function expandPathToNote(targetId, list = notes) {
-    for (const note of list) {
-      if (note.id === targetId) return true;
-      if (note.children.length > 0 && expandPathToNote(targetId, note.children)) {
-        expandedNoteIds.add(note.id);
-        return true;
-      }
-    }
-    return false;
+    return expandPathToNoteInTree(targetId, list, expandedNoteIds);
   }
 
   function createNote() {
@@ -722,15 +673,7 @@
     const parent = findNoteById(parentId);
     if (!parent) return;
 
-    const now = new Date();
-    const newNote = {
-      id: createNoteId(),
-      title: '',
-      content: '',
-      lastModified: now.toLocaleString(),
-      updatedAt: now.getTime(),
-      children: [],
-    };
+    const newNote = createEmptyNote();
 
     parent.children.push(newNote);
     expandedNoteIds.add(parentId);
@@ -768,12 +711,7 @@
   }
 
   function flattenNotes(list, output) {
-    list.forEach((note) => {
-      output.push(note);
-      if (note.children.length > 0) {
-        flattenNotes(note.children, output);
-      }
-    });
+    flattenNotesInTree(list, output);
   }
 
   function createNoteTree(note) {
@@ -903,14 +841,12 @@
       note.lastModified = now.toLocaleString();
       note.updatedAt = now.getTime();
     } else {
-      const newNote = {
-        id: createNoteId(),
+      const newNote = createEmptyNote({
         title,
         content,
         lastModified: now.toLocaleString(),
         updatedAt: now.getTime(),
-        children: [],
-      };
+      });
       notes.unshift(newNote);
       noteIdToSelect = newNote.id;
     }
@@ -1018,7 +954,7 @@
     desktopBridge?.reloadMirroredStorage?.();
 
     try {
-      notes = hydrateNotes(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
+      notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
     } catch {
       notes = [];
     }
@@ -1060,61 +996,22 @@
   }
 
   function applyHeadingLevel(level) {
-    mainContentInput.focus();
-    replaceLinePrefix(mainContentInput, `${'#'.repeat(level)} `, /^(#{1,6}\s+)/);
-    handleDraftInput('main');
+    applyHeadingLevelToInput(mainContentInput, level, handleMainEditorChange);
   }
 
   function insertAtLineStart(input, text) {
-    replaceLinePrefix(input, text, null);
+    insertAtLineStartInInput(input, text, handleMainEditorChange);
   }
 
   function replaceLinePrefix(input, prefix, matcher) {
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const value = input.value;
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-    const lineEnd = value.indexOf('\n', end);
-    const safeLineEnd = lineEnd === -1 ? value.length : lineEnd;
-    const lineText = value.slice(lineStart, safeLineEnd);
-    const matchedPrefix = matcher ? lineText.match(matcher)?.[0] || '' : '';
-    const nextLineText = matchedPrefix ? prefix + lineText.slice(matchedPrefix.length) : prefix + lineText;
-
-    input.value = value.slice(0, lineStart) + nextLineText + value.slice(safeLineEnd);
-
-    const selectionOffset = matcher && matchedPrefix
-      ? Math.max(0, start - lineStart - matchedPrefix.length)
-      : start - lineStart;
-    const nextCursor = lineStart + prefix.length + selectionOffset;
-
-    input.selectionStart = input.selectionEnd = nextCursor;
-    input.focus();
-    handleDraftInput('main');
+    replaceLinePrefixInInput(input, prefix, matcher, handleMainEditorChange);
   }
 
   function insertAtRange(input, text, start, end) {
-    const value = input.value;
-    input.value = value.slice(0, start) + text + value.slice(end);
-    input.selectionStart = input.selectionEnd = start + text.length;
-    input.focus();
-    handleDraftInput('main');
+    insertAtRangeInInput(input, text, start, end, handleMainEditorChange);
   }
 
   function insertAtCursor(input, text, selectStartOffset = 0, selectEndOffset = 0) {
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const value = input.value;
-
-    input.value = value.slice(0, start) + text + value.slice(end);
-
-    if (selectStartOffset !== 0 || selectEndOffset !== 0) {
-      input.selectionStart = start + selectStartOffset;
-      input.selectionEnd = start + text.length + selectEndOffset;
-    } else {
-      input.selectionStart = input.selectionEnd = start + text.length;
-    }
-
-    input.focus();
-    handleDraftInput('main');
+    insertAtCursorInInput(input, text, selectStartOffset, selectEndOffset, handleMainEditorChange);
   }
 });

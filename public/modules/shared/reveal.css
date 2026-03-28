@@ -1,0 +1,58 @@
+.module-reveal {
+  opacity: 0;
+  transform: translateY(24px) scale(0.985);
+  filter: blur(6px);
+  animation: module-reveal-rise 0.52s ease forwards;
+}
+
+.module-reveal.is-bounce {
+  animation-name: module-reveal-bounce;
+  animation-duration: 0.54s;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.2, 1.1);
+}
+
+.module-reveal.delay-1 { animation-delay: 0.04s; }
+.module-reveal.delay-2 { animation-delay: 0.12s; }
+.module-reveal.delay-3 { animation-delay: 0.18s; }
+.module-reveal.delay-4 { animation-delay: 0.26s; }
+.module-reveal.delay-5 { animation-delay: 0.34s; }
+.module-reveal.delay-6 { animation-delay: 0.46s; }
+.module-reveal.delay-7 { animation-delay: 0.58s; }
+.module-reveal.delay-8 { animation-delay: 0.66s; }
+.module-reveal.delay-9 { animation-delay: 0.74s; }
+.module-reveal.delay-10 { animation-delay: 0.82s; }
+.module-reveal.delay-11 { animation-delay: 0.9s; }
+
+@keyframes module-reveal-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes module-reveal-bounce {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.92);
+    filter: blur(6px);
+  }
+  62% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.04);
+    filter: blur(0);
+  }
+  82% {
+    transform: translateY(2px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}

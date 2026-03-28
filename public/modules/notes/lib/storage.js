@@ -1,4 +1,4 @@
-function readStoredNotes(storageKey) {
+export function readStoredNotes(storageKey) {
   try {
     return JSON.parse(localStorage.getItem(storageKey)) || [];
   } catch {
@@ -6,11 +6,11 @@ function readStoredNotes(storageKey) {
   }
 }
 
-function createNoteId() {
+export function createNoteId() {
   return Date.now() + Math.floor(Math.random() * 10000);
 }
 
-function hydrateNotes(list) {
+export function hydrateNotes(list) {
   if (!Array.isArray(list)) return [];
 
   return list.map((note) => ({
@@ -23,22 +23,36 @@ function hydrateNotes(list) {
   }));
 }
 
-function persistNotes(storageKey, notes) {
+export function createEmptyNote(overrides = {}) {
+  const now = new Date();
+  return {
+    id: createNoteId(),
+    title: '',
+    content: '',
+    lastModified: now.toLocaleString(),
+    updatedAt: now.getTime(),
+    children: [],
+    ...overrides,
+  };
+}
+
+export function persistNotes(storageKey, notes) {
   localStorage.setItem(storageKey, JSON.stringify(notes));
 }
 
-function getNoteUpdatedAt(note) {
+export function getNoteUpdatedAt(note) {
   if (Number.isFinite(note.updatedAt)) return note.updatedAt;
   return Date.parse(note.lastModified) || 0;
 }
 
-function getSortedNotes(list) {
+export function getSortedNotes(list) {
   return [...list].sort((a, b) => getNoteUpdatedAt(b) - getNoteUpdatedAt(a));
 }
 
 window.readStoredNotes = readStoredNotes;
 window.createNoteId = createNoteId;
 window.hydrateNotes = hydrateNotes;
+window.createEmptyNote = createEmptyNote;
 window.persistNotes = persistNotes;
 window.getNoteUpdatedAt = getNoteUpdatedAt;
 window.getSortedNotes = getSortedNotes;

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>彩虹抽奖轮盘</title>
+  <link rel="stylesheet" href="../shared/reveal.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -34,29 +35,29 @@
           </button>
         </div>
 
-        <div class="result-panel">
+        <div class="result-panel module-reveal is-bounce delay-4">
           <p class="result-label">本次结果</p>
           <p class="result-value" id="resultText">等待开始</p>
         </div>
       </div>
 
-      <section class="editor-panel" aria-labelledby="editorTitle">
-        <div class="editor-heading">
+      <section class="editor-panel module-reveal delay-6" aria-labelledby="editorTitle">
+        <div class="editor-heading module-reveal delay-7">
           <h2 id="editorTitle">手动添加轮盘内容</h2>
         </div>
 
         <label class="editor-label" for="itemInput">请输入</label>
-        <div class="input-row">
+        <div class="input-row module-reveal delay-8">
           <input id="itemInput" type="text" maxlength="18">
           <button class="secondary-button" id="addItemButton" type="button">添加</button>
         </div>
 
-        <div class="editor-actions">
+        <div class="editor-actions module-reveal delay-9">
           <button class="ghost-button" id="clearItemsButton" type="button">清空</button>
           <button class="ghost-button" id="resetItemsButton" type="button">恢复</button>
         </div>
 
-        <div class="items-list" id="itemsList" aria-live="polite"></div>
+        <div class="items-list module-reveal delay-10" id="itemsList" aria-live="polite"></div>
         <p class="editor-meta" id="segmentsMeta">当前 8 项</p>
       </section>
     </section>
