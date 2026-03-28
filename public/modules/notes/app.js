@@ -1,8 +1,9 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY = 'shanlic_notes';
   const desktopBridge = resolveDesktopBridge();
+  const markedInstance = window.marked;
 
-  let notes = hydrateNotes(readStoredNotes());
+  let notes = hydrateNotes(readStoredNotes(STORAGE_KEY));
   let activeNoteId = null;
   let draftNoteId = null;
   let draftTitle = '';
