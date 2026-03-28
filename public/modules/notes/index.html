@@ -4,64 +4,69 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SHANLIC LIFE</title>
+  <title>SHANLIC LIFE - 笔记</title>
   <link rel="stylesheet" href="style.css">
-  <!-- 引入 marked 库用于解析 Markdown -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- 引入 FontAwesome 用于图标 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <!-- 引入 GitHub Markdown CSS 用于美化阅读效果 -->
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
 </head>
 
 <body>
   <div class="app-container">
-    <!-- 左侧侧边栏 -->
     <div class="sidebar">
       <div class="sidebar-header">
-        <img src="豆包.png" alt="SHANLIC LIFE" class="logo">
-        <button id="add-note-btn" title="新建文档"><i class="fas fa-plus"></i></button>
+        <img src="logo.jpg" alt="SHANLIC LIFE" class="logo">
+        <button id="add-note-btn" title="新建笔记"><i class="fas fa-plus"></i></button>
       </div>
-      <div class="note-list" id="note-list">
-        <!-- 文档列表将通过 JS 动态生成 -->
-      </div>
+      <div class="note-list" id="note-list"></div>
     </div>
 
-    <!-- 主内容区域 -->
     <div class="main-content">
-      <!-- 顶部导航栏 -->
       <div class="top-bar">
         <div class="search-container">
           <i class="fas fa-search"></i>
-          <input type="text" id="search-input" placeholder="Search">
+          <input type="text" id="search-input" placeholder="搜索笔记">
           <span class="shortcut-hint">Ctrl K</span>
         </div>
+
         <div class="note-info">
-          <span id="last-modified">最后修改时间: -</span>
+          <span id="last-modified">最后修改时间：-</span>
         </div>
-        <div class="user-profile">
-          <a href="https://github.com/" target="_blank" title="前往 GitHub">
-            <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="User Avatar"
-              class="avatar">
-          </a>
+
+        <div class="top-actions">
+          <button id="side-editor-toggle-btn" class="header-action-btn" type="button" title="打开侧边小窗">
+            <i class="fas fa-table-columns"></i>
+            <span>侧边小窗</span>
+          </button>
+          <button id="desktop-floating-btn" class="header-action-btn desktop-only" type="button" title="打开桌面悬浮窗">
+            <i class="fas fa-note-sticky"></i>
+            <span>桌面悬浮窗</span>
+          </button>
         </div>
       </div>
 
-      <!-- 文档阅读/展示区 -->
       <div class="view-container" id="view-container" style="display: none;">
         <div class="view-header">
-          <h1 id="view-title">文档标题</h1>
+          <h1 id="view-title">笔记标题</h1>
           <div class="view-actions">
-            <span id="view-date">最后修改: -</span>
-            <button id="import-note-btn" class="action-btn" title="导入 .txt"><i class="fas fa-file-import"></i>
-              导入</button>
-            <button id="export-note-btn" class="action-btn" title="导出为 .txt"><i class="fas fa-file-export"></i>
-              导出</button>
-            <button id="edit-note-btn" class="edit-btn"><i class="fas fa-pen"></i> 编辑</button>
+            <span id="view-date">最后修改：-</span>
+            <button id="import-note-btn" class="action-btn" title="导入 .txt">
+              <i class="fas fa-file-import"></i>
+              导入
+            </button>
+            <button id="export-note-btn" class="action-btn" title="导出 .txt">
+              <i class="fas fa-file-export"></i>
+              导出
+            </button>
+            <button id="edit-note-btn" class="edit-btn" type="button">
+              <i class="fas fa-pen"></i>
+              正常编辑
+            </button>
             <input type="file" id="import-file-input" accept=".txt" style="display: none;">
           </div>
         </div>
+
         <div class="view-body">
           <div id="view-content" class="markdown-body"></div>
           <div class="view-toc">
@@ -71,91 +76,156 @@
         </div>
       </div>
 
-      <!-- 文档编辑区 -->
-      <div class="editor-container" id="editor-container" style="display: none;">
-        <input type="text" id="note-title" placeholder="请输入标题...">
-        <div class="editor-toolbar">
-          <!-- Group 1: History -->
-          <div class="toolbar-group">
-            <button id="btn-undo" title="撤销 (Ctrl+Z)"><i class="fas fa-undo"></i></button>
-            <button id="btn-redo" title="重做 (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+      <div id="editor-view" class="editor-view" style="display: none;">
+        <div class="view-header">
+          <div>
+            <div class="panel-kicker">Notes Studio</div>
+            <h1 id="editor-view-title">完整编辑</h1>
           </div>
-          <div class="toolbar-separator"></div>
-
-          <!-- Group 2: Format -->
-          <div class="toolbar-group">
-            <select id="select-heading" title="标题">
-              <option value="">段落</option>
-              <option value="h1">H1 标题</option>
-              <option value="h2">H2 标题</option>
-              <option value="h3">H3 标题</option>
-              <option value="h4">H4 标题</option>
-            </select>
-            <button id="btn-bold" title="加粗 (Ctrl+B)"><i class="fas fa-bold"></i></button>
-            <button id="btn-italic" title="斜体 (Ctrl+I)"><i class="fas fa-italic"></i></button>
-            <button id="btn-strikethrough" title="删除线"><i class="fas fa-strikethrough"></i></button>
-            <button id="btn-mark" title="高亮"><i class="fas fa-highlighter"></i></button>
-          </div>
-          <div class="toolbar-separator"></div>
-
-          <!-- Group 3: Lists & Align -->
-          <div class="toolbar-group">
-            <button id="btn-ul" title="无序列表"><i class="fas fa-list-ul"></i></button>
-            <button id="btn-ol" title="有序列表"><i class="fas fa-list-ol"></i></button>
-            <button id="btn-task" title="任务列表"><i class="fas fa-tasks"></i></button>
-            <button id="btn-align-left" title="左对齐"><i class="fas fa-align-left"></i></button>
-            <button id="btn-align-center" title="居中"><i class="fas fa-align-center"></i></button>
-            <button id="btn-align-right" title="右对齐"><i class="fas fa-align-right"></i></button>
-            <button id="btn-hr" title="分割线"><i class="fas fa-minus"></i></button>
-          </div>
-          <div class="toolbar-separator"></div>
-
-          <!-- Group 4: Blocks -->
-          <div class="toolbar-group">
-            <button id="btn-quote" title="引用"><i class="fas fa-quote-left"></i></button>
-            <button id="btn-code" title="代码块"><i class="fas fa-code"></i></button>
-            <button id="btn-table" title="表格"><i class="fas fa-table"></i></button>
-          </div>
-          <div class="toolbar-separator"></div>
-
-          <!-- Group 5: Media -->
-          <div class="toolbar-group">
-            <button id="btn-image" title="插入图片"><i class="far fa-image"></i></button>
-            <button id="btn-video" title="插入视频"><i class="fas fa-video"></i></button>
-            <button id="btn-formula" title="插入公式"><i class="fas fa-square-root-alt"></i></button>
-            <button id="btn-link" title="插入链接"><i class="fas fa-link"></i></button>
-          </div>
-          <div class="toolbar-separator"></div>
-
-          <!-- Group 6: Misc -->
-          <div class="toolbar-group">
-            <button id="btn-date" title="插入日期"><i class="far fa-calendar-alt"></i></button>
-            <button id="btn-widescreen" title="宽屏模式"><i class="fas fa-expand"></i></button>
+          <div class="view-actions">
+            <span id="editor-status">新笔记 · 尚未保存</span>
+            <button id="back-to-view-btn" class="ghost-btn" type="button">
+              <i class="fas fa-arrow-left"></i>
+              返回预览
+            </button>
+            <button id="save-main-note-btn" class="edit-btn" type="button">
+              <i class="fas fa-floppy-disk"></i>
+              保存笔记
+            </button>
           </div>
         </div>
-        <div class="content-area">
-          <textarea id="note-content" placeholder="在此输入内容 (支持 Markdown 标题 # ## ###，支持粘贴图片)"></textarea>
-          <!-- Preview and TOC removed as requested -->
+
+        <div class="editor-stage">
+          <input type="text" id="main-note-title" placeholder="请输入标题...">
+
+          <div class="editor-toolbar">
+            <div class="toolbar-group">
+              <button id="btn-undo" title="撤销 (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+              <button id="btn-redo" title="重做 (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            </div>
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+              <select id="select-heading" title="标题">
+                <option value="">段落</option>
+                <option value="h1">H1 标题</option>
+                <option value="h2">H2 标题</option>
+                <option value="h3">H3 标题</option>
+                <option value="h4">H4 标题</option>
+              </select>
+              <button id="btn-bold" title="加粗 (Ctrl+B)"><i class="fas fa-bold"></i></button>
+              <button id="btn-italic" title="斜体 (Ctrl+I)"><i class="fas fa-italic"></i></button>
+              <button id="btn-strikethrough" title="删除线"><i class="fas fa-strikethrough"></i></button>
+              <button id="btn-mark" title="高亮"><i class="fas fa-highlighter"></i></button>
+            </div>
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+              <button id="btn-ul" title="无序列表"><i class="fas fa-list-ul"></i></button>
+              <button id="btn-ol" title="有序列表"><i class="fas fa-list-ol"></i></button>
+              <button id="btn-task" title="任务列表"><i class="fas fa-tasks"></i></button>
+              <button id="btn-align-left" title="左对齐"><i class="fas fa-align-left"></i></button>
+              <button id="btn-align-center" title="居中"><i class="fas fa-align-center"></i></button>
+              <button id="btn-align-right" title="右对齐"><i class="fas fa-align-right"></i></button>
+              <button id="btn-hr" title="分割线"><i class="fas fa-minus"></i></button>
+            </div>
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+              <button id="btn-quote" title="引用"><i class="fas fa-quote-left"></i></button>
+              <button id="btn-code" title="代码块"><i class="fas fa-code"></i></button>
+              <button id="btn-table" title="表格"><i class="fas fa-table"></i></button>
+            </div>
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+              <button id="btn-image" title="插入图片"><i class="far fa-image"></i></button>
+              <button id="btn-video" title="插入视频"><i class="fas fa-video"></i></button>
+              <button id="btn-formula" title="插入公式"><i class="fas fa-square-root-alt"></i></button>
+              <button id="btn-link" title="插入链接"><i class="fas fa-link"></i></button>
+            </div>
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+              <button id="btn-date" title="插入日期"><i class="far fa-calendar-alt"></i></button>
+              <button id="btn-widescreen" title="宽屏模式"><i class="fas fa-expand"></i></button>
+            </div>
+          </div>
+
+          <div class="panel-shortcuts">
+            <span>快捷格式</span>
+            <span>Ctrl+1 = H1</span>
+            <span>Ctrl+2 = H2</span>
+            <span>Ctrl+S = 保存</span>
+          </div>
+
+          <div class="content-area">
+            <textarea id="main-note-content"
+              placeholder="在这里编辑内容，支持 Markdown 标题、列表、引用、代码块，也支持直接粘贴图片。"></textarea>
+          </div>
+
+          <button id="submit-note-btn" class="submit-btn" type="button">保存笔记</button>
         </div>
-        <button id="submit-note-btn" class="submit-btn">提交文档</button>
+      </div>
+
+      <button id="editor-launcher" class="editor-launcher" type="button" title="打开侧边小窗">
+        <i class="fas fa-note-sticky"></i>
+        <span>侧边小窗</span>
+      </button>
+
+      <div class="editor-container" id="editor-container" aria-label="侧边小窗编辑器">
+        <div class="editor-panel-header">
+          <div>
+            <div class="panel-kicker">Quick Panel</div>
+            <div class="panel-title">侧边小窗编辑</div>
+          </div>
+          <button id="close-editor-btn" class="panel-close-btn" type="button" title="关闭侧边小窗">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+
+        <p class="panel-caption">这里适合快速补几句话，完整格式化编辑依然保留在主编辑区。</p>
+
+        <input type="text" id="side-note-title" placeholder="小窗标题...">
+
+        <div class="panel-body">
+          <textarea id="side-note-content" placeholder="快速记录一段内容..."></textarea>
+        </div>
+
+        <div class="panel-actions">
+          <button id="panel-open-main-btn" class="ghost-btn" type="button">
+            <i class="fas fa-up-right-and-down-left-from-center"></i>
+            完整编辑
+          </button>
+          <button id="panel-open-desktop-btn" class="ghost-btn desktop-only" type="button">
+            <i class="fas fa-window-restore"></i>
+            桌面悬浮窗
+          </button>
+          <button id="panel-save-btn" class="submit-btn compact" type="button">
+            <i class="fas fa-floppy-disk"></i>
+            保存
+          </button>
+        </div>
+
+        <p id="panel-status" class="panel-status">等待编辑</p>
       </div>
 
       <div id="empty-state" class="empty-state">
         <i class="fas fa-book-open"></i>
+        <p>先从左侧选择一篇笔记，或者新建一篇开始写。</p>
       </div>
     </div>
   </div>
 
-  <!-- 自定义右键菜单 -->
   <div id="context-menu" class="context-menu">
     <div class="menu-item" id="open-note-option">
-      <i class="fas fa-edit"></i> 打开/编辑
+      <i class="fas fa-edit"></i> 打开 / 编辑
     </div>
     <div class="menu-item" id="add-sub-note-option">
-      <i class="fas fa-code-branch"></i> 新建子文档
+      <i class="fas fa-code-branch"></i> 新建子笔记
     </div>
     <div class="menu-item" id="delete-note-option">
-      <i class="fas fa-trash-alt"></i> 删除文档
+      <i class="fas fa-trash-alt"></i> 删除笔记
     </div>
   </div>
 

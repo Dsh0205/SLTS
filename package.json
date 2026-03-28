@@ -1,14 +1,19 @@
 {
   "name": "shanlic-life-tracker-system",
-  "version": "0.0.0",
+  "version": "1.1.2",
   "private": true,
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "npm run type-check && npm run build-only",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build"
+    "type-check": "vue-tsc --build",
+    "electron": "node electron/launch.cjs .",
+    "electron:dev": "wait-on tcp:127.0.0.1:5173 && node electron/launch.cjs .",
+    "desktop:dev": "concurrently -k \"npm run dev -- --host 127.0.0.1 --strictPort\" \"npm run electron:dev\"",
+    "desktop:build": "npm run build && electron-builder"
   },
   "dependencies": {
     "vue": "^3.5.30"
@@ -18,13 +23,43 @@
     "@types/node": "^24.12.0",
     "@vitejs/plugin-vue": "^6.0.4",
     "@vue/tsconfig": "^0.9.0",
+    "concurrently": "^9.2.1",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
     "npm-run-all2": "^8.0.4",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-vue-devtools": "^8.0.7",
+    "wait-on": "^8.0.5",
     "vue-tsc": "^3.2.5"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
+  },
+  "build": {
+    "appId": "com.shanlic.life-tracker",
+    "productName": "SHANLIC LIFE TRACKER SYSTEM",
+    "icon": "electron/assets/icon-256.png",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "public"
+    },
+    "win": {
+      "icon": "electron/assets/icon-256.png",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SHANLIC LIFE TRACKER SYSTEM"
+    }
   }
 }

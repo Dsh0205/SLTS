@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>悬浮笔记窗</title>
+  <link rel="stylesheet" href="floating.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+  <div class="floating-shell">
+    <section class="floating-window">
+      <header class="floating-header drag-region">
+        <div class="floating-title-group">
+          <div class="floating-kicker">Floating Notes</div>
+          <div class="floating-title">悬浮笔记窗</div>
+        </div>
+
+        <div class="floating-header-actions no-drag">
+          <button id="pin-toggle-btn" class="header-btn pin-btn is-active" type="button" title="切换固定状态">
+            <i class="fas fa-thumbtack"></i>
+          </button>
+          <button id="new-note-btn" class="header-btn" type="button" title="新建笔记">
+            <i class="fas fa-plus"></i>
+          </button>
+          <button id="close-widget-btn" class="header-btn" type="button" title="关闭悬浮窗">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="floating-toolbar">
+        <label class="picker-field" for="note-picker">
+          <span>当前笔记</span>
+          <select id="note-picker" class="no-drag"></select>
+        </label>
+        <button id="pin-status-btn" class="top-badge no-drag is-active" type="button">
+          <i class="fas fa-thumbtack"></i>
+          <span id="pin-status-label">固定中</span>
+        </button>
+      </div>
+
+      <main class="floating-body">
+        <input id="note-title" class="floating-title-input no-drag" type="text" placeholder="输入标题...">
+        <textarea
+          id="note-content"
+          class="floating-content-input no-drag"
+          placeholder="在这里记录内容。Ctrl+1 插入 H1，Ctrl+2 插入 H2，Ctrl+S 保存。"
+        ></textarea>
+      </main>
+
+      <footer class="floating-footer">
+        <span id="save-status" class="save-status">准备就绪</span>
+        <button id="save-note-btn" class="save-btn no-drag" type="button">保存</button>
+      </footer>
+    </section>
+  </div>
+
+  <script src="floating.js"></script>
+</body>
+
+</html>

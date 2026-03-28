@@ -21,11 +21,11 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
   color: var(--text-main);
   background:
-    radial-gradient(circle at 18% 16%, rgba(255, 129, 182, 0.22), transparent 22%),
-    radial-gradient(circle at 82% 14%, rgba(99, 215, 255, 0.24), transparent 20%),
-    radial-gradient(circle at 50% 76%, rgba(255, 215, 102, 0.2), transparent 26%),
-    radial-gradient(circle at 28% 72%, rgba(172, 121, 255, 0.16), transparent 20%),
-    linear-gradient(180deg, #fffdfd 0%, #f8fcff 48%, #fdf8ff 100%);
+    radial-gradient(circle at 12% 18%, rgba(77, 163, 255, 0.48), transparent 26%),
+    radial-gradient(circle at 88% 16%, rgba(190, 227, 255, 0.86), transparent 28%),
+    radial-gradient(circle at 14% 84%, rgba(77, 163, 255, 0.3), transparent 24%),
+    radial-gradient(circle at 86% 82%, rgba(77, 163, 255, 0.3), transparent 26%),
+    linear-gradient(180deg, #d1e8ff 0%, #c2ddff 52%, #d4e9ff 100%);
   overflow-x: hidden;
 }
 
@@ -43,7 +43,7 @@ body::before {
   left: 8%;
   width: 78px;
   height: 78px;
-  background: rgba(255, 142, 182, 0.4);
+  background: rgba(77, 163, 255, 0.46);
   border-radius: 45% 55% 50% 40%;
 }
 
@@ -52,7 +52,7 @@ body::after {
   bottom: 16%;
   width: 110px;
   height: 110px;
-  background: rgba(103, 214, 255, 0.28);
+  background: rgba(77, 163, 255, 0.38);
   border-radius: 50%;
 }
 
@@ -84,6 +84,11 @@ body::after {
     0 24px 60px rgba(154, 171, 214, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(18px);
+  opacity: 0;
+  transform: translateY(0);
+  filter: blur(0);
+  animation: panel-rise-in 0.6s ease forwards;
+  animation-delay: 0.04s;
 }
 
 .eyebrow {
@@ -251,6 +256,11 @@ canvas {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     0 12px 24px rgba(128, 151, 204, 0.16);
+  opacity: 0;
+  transform: translateY(0);
+  filter: blur(0);
+  animation: panel-bounce-in 0.58s cubic-bezier(0.2, 0.9, 0.2, 1.1) forwards;
+  animation-delay: 0.34s;
 }
 
 .result-label {
@@ -284,7 +294,29 @@ canvas {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     0 16px 30px rgba(128, 151, 204, 0.12);
+  opacity: 0;
+  transform: translateY(0);
+  filter: blur(0);
+  animation: panel-rise-in 0.62s ease forwards;
+  animation-delay: 0.46s;
 }
+
+.editor-heading,
+.input-row,
+.editor-actions,
+.items-list,
+.editor-meta {
+  opacity: 0;
+  transform: translateY(0);
+  filter: blur(0);
+  animation: panel-rise-in 0.46s ease forwards;
+}
+
+.editor-heading { animation-delay: 0.58s; }
+.input-row { animation-delay: 0.66s; }
+.editor-actions { animation-delay: 0.74s; }
+.items-list { animation-delay: 0.82s; }
+.editor-meta { animation-delay: 0.9s; }
 
 .editor-heading h2 {
   margin: 0;
@@ -443,6 +475,40 @@ input:disabled {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes panel-rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes panel-bounce-in {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.92);
+    filter: blur(6px);
+  }
+  62% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.04);
+    filter: blur(0);
+  }
+  82% {
+    transform: translateY(2px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 

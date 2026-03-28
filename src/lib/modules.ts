@@ -1,4 +1,4 @@
-export type ModuleKey = 'notes' | 'lottery' | 'flight' | 'comic' | 'words'
+export type ModuleKey = 'notes' | 'lottery' | 'flight' | 'words' | 'quadrant'
 
 export interface ModuleDefinition {
   key: ModuleKey
@@ -73,19 +73,19 @@ export const modules: ModuleDefinition[] = [
     }
   },
   {
-    key: 'comic',
-    title: '\u6f2b\u753b\u67e5\u8be2',
-    subtitle: '\u67e5\u8be2\u4e0e\u68c0\u7d22',
-    color: '#59d9ff',
-    colorSoft: '#c6f7ff',
-    publicEntry: 'modules/comic/index.html',
+    key: 'quadrant',
+    title: '\u56db\u8c61\u9650\u56fe',
+    subtitle: '\u5750\u6807\u4e0e\u8bb0\u5f55',
+    color: '#0b0b0b',
+    colorSoft: '#6e6e6e',
+    publicEntry: 'modules/quadrant/index.html',
     orbit: {
       size: '700px',
       duration: '44s',
       delay: '-9s',
       rotation: '12deg'
     }
-  }
+  },
 ]
 
 export const modulesByKey = Object.fromEntries(

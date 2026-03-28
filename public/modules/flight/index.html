@@ -7,14 +7,14 @@
   <title>飞机航班查询</title>
   <style>
     :root {
-      --bg: #ffffff;
+      --bg: #fff2f4;
       --text: #0f1216;
-      --muted: #6b7280;
-      --card: #ffffff;
-      --border: #e5e7eb;
-      --primary: #111827;
+      --muted: #7f5c64;
+      --card: rgba(255, 255, 255, 0.88);
+      --border: rgba(255, 106, 120, 0.16);
+      --primary: #ff6a78;
       --primary-contrast: #ffffff;
-      --accent: #ff69b4;
+      --accent: #ff9aa6;
     }
 
     .dark {
@@ -39,11 +39,44 @@
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, Arial, sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 106, 120, 0.34), transparent 24%),
+        radial-gradient(circle at 86% 14%, rgba(255, 193, 201, 0.78), transparent 28%),
+        radial-gradient(circle at 14% 82%, rgba(255, 106, 120, 0.2), transparent 22%),
+        radial-gradient(circle at 88% 84%, rgba(255, 106, 120, 0.18), transparent 24%),
+        linear-gradient(180deg, #ffe4e9, var(--bg));
       color: var(--text);
     }
 
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(10px);
+      opacity: 0.74;
+    }
+
+    body::before {
+      width: 220px;
+      height: 220px;
+      top: -70px;
+      right: -50px;
+      background: rgba(255, 106, 120, 0.24);
+    }
+
+    body::after {
+      width: 180px;
+      height: 180px;
+      left: -44px;
+      bottom: -48px;
+      background: rgba(255, 193, 201, 0.72);
+    }
+
     .container {
+      position: relative;
+      z-index: 1;
       max-width: 980px;
       margin: 0 auto;
       padding: 24px;
@@ -52,9 +85,10 @@
     .site-header {
       position: sticky;
       top: 0;
-      background: var(--bg);
+      background: rgba(255, 242, 244, 0.86);
       border-bottom: 1px solid var(--border);
       z-index: 10;
+      backdrop-filter: blur(12px);
     }
 
     .site-title {
@@ -124,6 +158,75 @@
       border-radius: 16px;
       padding: 24px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, .04);
+    }
+
+    .site-title,
+    .site-subtitle,
+    .actions > *,
+    main .card {
+      opacity: 0;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+
+    .site-title {
+      animation: module-rise-in 0.48s ease forwards;
+      animation-delay: 0.04s;
+    }
+
+    .site-subtitle {
+      animation: module-rise-in 0.48s ease forwards;
+      animation-delay: 0.12s;
+    }
+
+    .actions > * {
+      animation: module-bounce-in 0.54s cubic-bezier(0.2, 0.9, 0.2, 1.1) forwards;
+    }
+
+    .actions > *:nth-child(1) { animation-delay: 0.18s; }
+    .actions > *:nth-child(2) { animation-delay: 0.26s; }
+    .actions > *:nth-child(3) { animation-delay: 0.34s; }
+
+    main .card {
+      animation: module-rise-in 0.52s ease forwards;
+    }
+
+    main .card:nth-of-type(1) { animation-delay: 0.2s; }
+    main .card:nth-of-type(2) { animation-delay: 0.3s; }
+    main .card:nth-of-type(3) { animation-delay: 0.4s; }
+
+    @keyframes module-rise-in {
+      0% {
+        opacity: 0;
+        transform: translateY(22px) scale(0.985);
+        filter: blur(6px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
+    }
+
+    @keyframes module-bounce-in {
+      0% {
+        opacity: 0;
+        transform: translateY(24px) scale(0.92);
+        filter: blur(6px);
+      }
+      62% {
+        opacity: 1;
+        transform: translateY(-4px) scale(1.04);
+        filter: blur(0);
+      }
+      82% {
+        transform: translateY(2px) scale(0.99);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
     }
 
     .card h2 {
@@ -253,7 +356,7 @@
       <nav class="actions">
         <button id="toggle-theme" class="btn primary">夜晚模式/白天模式</button>
         <button id="say-hello" class="btn">功能按钮</button>
-        <a class="btn" href="./漫画查询.html">漫画按钮</a>
+        <a class="btn" href="../comic/index.html">漫画按钮</a>
       </nav>
     </div>
   </header>

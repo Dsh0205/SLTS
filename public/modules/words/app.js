@@ -11,21 +11,27 @@ const wordBanks = {
 
 const wrongRecords = new Map();
 
-let currentCorrectIndex = -1;
 let currentMode = "english";
+let practiceEntries = [];
 let currentQuizEntries = [];
+let currentRoundPendingEntries = [];
+let currentQuestionEntry = null;
+let currentRoundSize = 0;
 let currentSelectedGroupIds = [];
 let sessionActive = false;
 let transitionLock = false;
-let lastQuestionIndex = -1;
+let lastQuestionKey = "";
 let toastTimer = null;
 let answeredCountValue = 0;
 let correctCountValue = 0;
 let wrongCountValue = 0;
 let activeWordFileHandle = null;
+let activeWordFilePath = "";
 let roundCelebrationVisible = false;
 let pendingGroupMode = "english";
 let pendingGroupSelection = new Set();
+let masteredEntryKeys = new Set();
+let carryOverWrongKeys = new Set();
 
 const activeLibraryGroupIds = {
   english: "",
@@ -127,10 +133,11 @@ const RUSSIAN_KEYBOARD_LAYOUT = [
   ["ф", "ы", "в", "а", "п", "р", "о", "л", "д", "ж", "э"],
   ["я", "ч", "с", "м", "и", "т", "ь", "б", "ю", "ё"],
   [
-    { label: "空格", value: " ", className: "space" },
+    { label: "Space", value: " ", className: "space" },
+    { label: "/", value: "/" },
     { label: "-", value: "-" },
-    { label: "换行", value: "\n", className: "wide" },
-    { label: "退格", action: "backspace", className: "wide" }
+    { label: "Enter", value: "\n", className: "wide" },
+    { label: "Backspace", action: "backspace", className: "wide" }
   ]
 ];
 
@@ -219,7 +226,7 @@ function initRussianKeyboard() {
       if (typeof item === "string") {
         key.textContent = item;
         key.dataset.value = item;
-        key.setAttribute("aria-label", "输入 " + item);
+        key.setAttribute("aria-label", "Input " + item);
       } else {
         key.textContent = item.label;
         if (item.value !== undefined) {
@@ -283,13 +290,13 @@ function openGroupSelector(mode) {
   const availableGroups = groups.filter((group) => group.entries.length > 0);
 
   if (groups.length === 0) {
-    showToast("请先在" + wordBanks[mode].label + "词库里创建分组。", "error");
+    showToast("Please create a group in the " + wordBanks[mode].label + " library first.", "error");
     showView("library");
     return;
   }
 
   if (availableGroups.length === 0) {
-    showToast("当前还没有可用于测试的分组，请先在词库里加入单词。", "error");
+    showToast("There is no group available for testing yet. Add some words first.", "error");
     showView("library");
     return;
   }
@@ -309,7 +316,7 @@ function hideGroupSelector() {
 function renderGroupSelector() {
   const groups = getGroups(pendingGroupMode);
   groupSelectorTitle.textContent = wordBanks[pendingGroupMode].label + "测试分组";
-  groupSelectorHint.textContent = "可多选分组合并测试；空分组不会参与出题。";
+  groupSelectorHint.textContent = "You can select multiple groups. Empty groups will not be used in tests.";
   groupSelectorList.innerHTML = "";
 
   groups.forEach((group) => {
@@ -337,7 +344,7 @@ function renderGroupSelector() {
     meta.className = "group-picker-meta";
     meta.innerHTML =
       "<strong>" + escapeHtml(group.name) + "</strong>" +
-      "<span>" + group.entries.length + " 组单词</span>";
+      "<span>" + group.entries.length + " entries</span>";
 
     option.appendChild(checkbox);
     option.appendChild(meta);
@@ -357,7 +364,7 @@ function selectAllGroupsForPendingMode() {
 
 function clearPendingGroupSelection() {
   pendingGroupSelection = new Set();
-  setGroupSelectorStatus("请至少选择一个含有单词的分组。", "error");
+  setGroupSelectorStatus("Please select at least one group that contains words.", "error");
   renderGroupSelector();
 }
 
@@ -366,27 +373,39 @@ function confirmGroupSelection() {
   const entries = collectEntriesFromGroups(pendingGroupMode, selectedGroupIds);
 
   if (selectedGroupIds.length === 0) {
-    setGroupSelectorStatus("请至少选择一个含有单词的分组。", "error");
-    showToast("请至少选择一个分组。", "error");
+    setGroupSelectorStatus("Please select at least one group that contains words.", "error");
+    showToast("Please select at least one group.", "error");
     return;
   }
 
-  if (entries.length < 2 || getUniqueMeaningCountFromEntries(entries) < 2) {
-    setGroupSelectorStatus("所选分组至少需要 2 组单词，并且要有 2 个不同释义。", "error");
-    showToast("所选分组至少需要 2 组单词，并且要有 2 个不同释义。", "error");
+  if (!hasSufficientQuizEntries(entries)) {
+    setGroupSelectorStatus("Selected groups need at least 2 entries with 2 different meanings.", "error");
+    showToast("Selected groups need at least 2 entries with 2 different meanings.", "error");
     return;
   }
 
   currentMode = pendingGroupMode;
   currentSelectedGroupIds = selectedGroupIds.slice();
-  currentQuizEntries = entries.slice();
+  practiceEntries = shuffleArray(entries.slice());
+  currentQuizEntries = [];
+  currentRoundPendingEntries = [];
+  currentQuestionEntry = null;
+  currentRoundSize = 0;
+  masteredEntryKeys = new Set();
+  carryOverWrongKeys = new Set();
   sessionActive = true;
   roundCelebrationVisible = false;
   setLibraryActionsDisabled(true);
-  resetRoundSession();
   setGroupSelectorStatus();
   hideGroupSelector();
   showView("quiz");
+
+  if (!prepareNextRound()) {
+    exitQuiz();
+    showToast("There are not enough words left to start a test.", "error");
+    return;
+  }
+
   nextQuestion();
 }
 
@@ -402,13 +421,34 @@ function exitQuiz() {
   showView("result");
 }
 
+function prepareNextRound() {
+  const availableEntries = getRemainingPracticeEntries();
+  currentQuizEntries = [];
+  currentRoundPendingEntries = [];
+  currentQuestionEntry = null;
+  currentRoundSize = 0;
+
+  if (!hasSufficientQuizEntries(availableEntries)) {
+    resetRoundSession();
+    return false;
+  }
+
+  currentQuizEntries = buildRoundEntries(availableEntries);
+  currentRoundPendingEntries = currentQuizEntries.slice();
+  currentRoundSize = currentRoundPendingEntries.length;
+  resetRoundSession();
+  return hasSufficientQuizEntries(currentQuizEntries);
+}
+
 function resetRoundSession() {
   wrongRecords.clear();
-  lastQuestionIndex = -1;
+  currentQuestionEntry = null;
+  lastQuestionKey = "";
   transitionLock = false;
   answeredCountValue = 0;
   correctCountValue = 0;
   wrongCountValue = 0;
+  options.innerHTML = "";
   renderWrongRecords();
   renderResultStats();
   renderRoundProgress();
@@ -418,20 +458,19 @@ function nextQuestion() {
   if (
     !sessionActive ||
     roundCelebrationVisible ||
-    answeredCountValue >= ROUND_SIZE ||
-    currentQuizEntries.length < 2 ||
-    getUniqueMeaningCountFromEntries(currentQuizEntries) < 2
+    currentRoundPendingEntries.length === 0 ||
+    !hasSufficientQuizEntries(currentQuizEntries)
   ) {
     return;
   }
 
   options.innerHTML = "";
   playQuestionReveal();
-  currentCorrectIndex = pickQuestionIndex(currentQuizEntries);
-  lastQuestionIndex = currentCorrectIndex;
-  questionWord.textContent = currentQuizEntries[currentCorrectIndex].word;
+  currentQuestionEntry = pickQuestionEntry(currentRoundPendingEntries);
+  lastQuestionKey = getEntryKey(currentQuestionEntry);
+  questionWord.textContent = currentQuestionEntry.word;
 
-  const optionItems = buildOptionItems(currentQuizEntries, currentCorrectIndex);
+  const optionItems = buildOptionItems(currentQuizEntries, currentQuestionEntry);
   optionItems.forEach((item, index) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -444,21 +483,25 @@ function nextQuestion() {
   });
 }
 
-function pickQuestionIndex(entries) {
+function pickQuestionEntry(entries) {
   let index = Math.floor(Math.random() * entries.length);
-  while (entries.length > 1 && index === lastQuestionIndex) {
+  let entry = entries[index];
+
+  while (entries.length > 1 && getEntryKey(entry) === lastQuestionKey) {
     index = Math.floor(Math.random() * entries.length);
+    entry = entries[index];
   }
-  return index;
+
+  return entry;
 }
 
-function buildOptionItems(entries, correctIndex) {
+function buildOptionItems(entries, correctEntry) {
   const targetOptionCount = Math.max(2, Math.min(4, getUniqueMeaningCountFromEntries(entries)));
   const optionItems = [{
-    meaning: entries[correctIndex].meaning,
+    meaning: correctEntry.meaning,
     correct: true
   }];
-  const usedMeanings = new Set([entries[correctIndex].meaning]);
+  const usedMeanings = new Set([correctEntry.meaning]);
 
   while (optionItems.length < targetOptionCount) {
     const randomIndex = Math.floor(Math.random() * entries.length);
@@ -478,7 +521,7 @@ function buildOptionItems(entries, correctIndex) {
 }
 
 function handleOptionClick(button, isCorrect) {
-  if (!sessionActive || transitionLock) {
+  if (!sessionActive || transitionLock || !currentQuestionEntry) {
     return;
   }
 
@@ -489,23 +532,30 @@ function handleOptionClick(button, isCorrect) {
   });
 
   const correctButton = optionButtons.find((btn) => btn.dataset.correct === "true");
+  const entry = currentQuestionEntry;
+  const entryKey = getEntryKey(entry);
   answeredCountValue += 1;
 
   if (isCorrect) {
     correctCountValue += 1;
+    masteredEntryKeys.add(entryKey);
+    carryOverWrongKeys.delete(entryKey);
     button.classList.add("correct");
     triggerFlash("flash-success");
   } else {
     wrongCountValue += 1;
+    carryOverWrongKeys.add(entryKey);
     button.classList.add("incorrect");
     if (correctButton) {
       correctButton.classList.add("correct");
     }
-    recordWrongWord(currentQuizEntries[currentCorrectIndex]);
+    recordWrongWord(entry);
     renderWrongRecords();
     triggerFlash("flash-error");
   }
 
+  currentRoundPendingEntries = currentRoundPendingEntries.filter((item) => getEntryKey(item) !== entryKey);
+  currentQuestionEntry = null;
   renderResultStats();
   renderRoundProgress();
 
@@ -515,7 +565,7 @@ function handleOptionClick(button, isCorrect) {
       return;
     }
 
-    if (answeredCountValue >= ROUND_SIZE) {
+    if (currentRoundPendingEntries.length === 0) {
       showRoundCompletion();
       return;
     }
@@ -524,8 +574,12 @@ function handleOptionClick(button, isCorrect) {
   }, 900);
 }
 
-function getWrongRecordKey(entry) {
+function getEntryKey(entry) {
   return entry.word + "\u0000" + entry.meaning;
+}
+
+function getWrongRecordKey(entry) {
+  return getEntryKey(entry);
 }
 
 function recordWrongWord(entry) {
@@ -575,9 +629,18 @@ function renderResultStats() {
 }
 
 function renderRoundProgress() {
-  const current = sessionActive ? Math.min(answeredCountValue + 1, ROUND_SIZE) : Math.min(answeredCountValue, ROUND_SIZE);
-  const displayValue = roundCelebrationVisible ? ROUND_SIZE : current;
-  roundProgress.textContent = "第 " + displayValue + " / " + ROUND_SIZE + " 题";
+  const total = Math.max(currentRoundSize, answeredCountValue, 0);
+
+  if (total === 0) {
+    roundProgress.textContent = "Round 0 / 0";
+    return;
+  }
+
+  const current = sessionActive && !roundCelebrationVisible
+    ? Math.min(answeredCountValue + 1, total)
+    : Math.min(answeredCountValue, total);
+  const displayValue = roundCelebrationVisible ? total : current;
+  roundProgress.textContent = "Round " + displayValue + " / " + total;
 }
 
 function showRoundCompletion() {
@@ -589,11 +652,17 @@ function showRoundCompletion() {
     ? 0
     : Math.round((correctCountValue / answeredCountValue) * 100);
 
-  roundCompleteTitle.textContent = "恭喜你完成了一组练习";
-  roundCorrectLine.textContent = "答对 " + correctCountValue + " 个";
-  roundWrongLine.textContent = "答错 " + wrongCountValue + " 个";
-  roundAccuracyLine.textContent = "准确率 " + accuracy + "%";
+  roundCompleteTitle.textContent = "Round complete";
+  roundCorrectLine.textContent = "Correct: " + correctCountValue;
+  roundWrongLine.textContent = "Wrong: " + wrongCountValue;
+  roundAccuracyLine.textContent = "准确率：" + accuracy + "%";
   roundContinuePrompt.textContent = "是否继续完成下一组？";
+
+  const hasNextRound = hasNextRoundAvailable();
+  roundContinueBtn.hidden = !hasNextRound;
+  if (!hasNextRound) {
+    roundContinuePrompt.textContent = "Current practice words are finished.";
+  }
 
   renderCelebrationEffect();
   roundCompleteOverlay.hidden = false;
@@ -614,7 +683,12 @@ function continueNextRound() {
 
   roundCelebrationVisible = false;
   hideRoundCelebration();
-  resetRoundSession();
+
+  if (!prepareNextRound()) {
+    finishPracticeLoop();
+    return;
+  }
+
   nextQuestion();
 }
 
@@ -724,39 +798,6 @@ function renderConfettiEffect() {
   }
 }
 
-async function openImportPicker() {
-  if (sessionActive) {
-    showToast("请先退出当前测试，再导入词库。", "error");
-    return;
-  }
-
-  if (supportsFileSystemAccess()) {
-    try {
-      const [fileHandle] = await window.showOpenFilePicker(JSON_FILE_PICKER_OPTIONS);
-      const file = await fileHandle.getFile();
-      await importWordsFromFile(file, fileHandle);
-      return;
-    } catch (error) {
-      if (isUserCancelledFilePicker(error)) {
-        return;
-      }
-      console.warn("文件选择器不可用，改为普通导入：", error);
-    }
-  }
-
-  importFileInput.value = "";
-  importFileInput.click();
-}
-
-async function handleImportFile(event) {
-  const file = event.target.files[0];
-  if (!file) {
-    return;
-  }
-
-  await importWordsFromFile(file, null);
-}
-
 function parseImportedWords(rawText) {
   const parsed = JSON.parse(rawText);
 
@@ -785,7 +826,7 @@ function parseImportedWords(rawText) {
   const chineseMeanings = Array.isArray(parsed.chineseMeanings) ? parsed.chineseMeanings : null;
 
   if (!englishWords || !chineseMeanings || englishWords.length !== chineseMeanings.length) {
-    throw new Error("JSON 格式不正确，请使用分组格式或旧版 englishWords/chineseMeanings。");
+    throw new Error("Invalid JSON format. Use grouped data or englishWords/chineseMeanings.");
   }
 
   return {
@@ -802,63 +843,9 @@ function parseImportedWords(rawText) {
   };
 }
 
-async function importWordsFromFile(file, fileHandle) {
-  try {
-    const text = await file.text();
-    const imported = parseImportedWords(String(text || ""));
-    replaceWordLibrary(imported);
-    activeWordFileHandle = fileHandle;
-    showToast("词库导入成功。", "success");
-  } catch (error) {
-    showToast(error.message || "导入失败，请检查 JSON 格式。", "error");
-  }
-}
-
-async function exportWordsToFile() {
-  const payload = {
-    english: { groups: exportGroups("english") },
-    russian: { groups: exportGroups("russian") }
-  };
-
-  if (payload.english.groups.length === 0 && payload.russian.groups.length === 0) {
-    showToast("词库为空，暂时没有内容可导出。", "error");
-    return;
-  }
-
-  const jsonText = JSON.stringify(payload, null, 2);
-
-  if (supportsFileSystemAccess()) {
-    try {
-      await saveWordsToPickedFile(jsonText);
-      showToast("词库已保存到选中的 JSON 文件。", "success");
-      return;
-    } catch (error) {
-      if (isUserCancelledFilePicker(error)) {
-        return;
-      }
-      console.warn("直接写入文件失败，改为下载导出：", error);
-    }
-  }
-
-  const blob = new Blob([jsonText], {
-    type: "application/json;charset=utf-8"
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = "words.json";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-
-  showToast("词库已导出为 words.json。", "success");
-}
-
 function createGroupFromInput(mode) {
   if (sessionActive) {
-    showToast("请先退出当前测试，再修改词库。", "error");
+    showToast("Please exit the current test before editing the library.", "error");
     return;
   }
 
@@ -866,13 +853,13 @@ function createGroupFromInput(mode) {
   const name = String(input.value || "").trim();
 
   if (!name) {
-    showToast("请先输入分组名称。", "error");
+    showToast("Please enter a group name first.", "error");
     return;
   }
 
   const duplicate = getGroups(mode).some((group) => group.name.toLowerCase() === name.toLowerCase());
   if (duplicate) {
-    showToast("这个分组名称已经存在了。", "error");
+    showToast("This group name already exists.", "error");
     return;
   }
 
@@ -886,19 +873,19 @@ function createGroupFromInput(mode) {
   input.value = "";
   saveWords();
   refreshAllDisplays();
-  showToast("已创建" + wordBanks[mode].label + "分组：" + name, "success");
+  showToast("Created " + wordBanks[mode].label + " group: " + name, "success");
 }
 
 function addManualEntries(mode) {
   if (sessionActive) {
-    showToast("请先退出当前测试，再修改词库。", "error");
+    showToast("Please exit the current test before editing the library.", "error");
     return;
   }
 
   const groupId = activeLibraryGroupIds[mode];
   const group = findGroup(mode, groupId);
   if (!group) {
-    showToast("请先创建并选择一个" + wordBanks[mode].label + "分组。", "error");
+    showToast("Please create and select a " + wordBanks[mode].label + " group first.", "error");
     return;
   }
 
@@ -908,12 +895,12 @@ function addManualEntries(mode) {
   try {
     entries = parseManualEntries(input.value, mode, wordBanks[mode].label);
   } catch (error) {
-    showToast(error.message || "单词格式不正确，请检查后重试。", "error");
+    showToast(error.message || "Invalid word format. Please check and try again.", "error");
     return;
   }
 
   if (entries.length === 0) {
-    showToast("请输入" + wordBanks[mode].label + "单词和中文。", "error");
+    showToast("Please enter " + wordBanks[mode].label + " words and meanings.", "error");
     return;
   }
 
@@ -929,11 +916,11 @@ function addManualEntries(mode) {
   refreshAllDisplays();
 
   if (addedCount === 0) {
-    showToast("当前分组里已经有这些词条了。", "error");
+    showToast("These entries already exist in the current group.", "error");
     return;
   }
 
-  showToast("已加入 " + addedCount + " 组" + wordBanks[mode].label + "单词。", "success");
+  showToast("Added " + addedCount + " " + wordBanks[mode].label + " entries.", "success");
 }
 
 function parseManualEntries(text, mode, label) {
@@ -942,85 +929,40 @@ function parseManualEntries(text, mode, label) {
 }
 
 function parseManualLine(line, index, mode, label) {
-  const delimiters = ["\t", "：", ":", "，", ",", " - ", "-", "="];
-
-  for (const delimiter of delimiters) {
-    if (!line.includes(delimiter)) {
-      continue;
-    }
-
-    const parts = line.split(delimiter).map((part) => part.trim()).filter(Boolean);
-    if (parts.length >= 2) {
-      return {
-        word: parts[0],
-        meaning: parts.slice(1).join(" ")
-      };
-    }
-  }
-
-  if (mode === "russian") {
-    const phraseEntry = parseRussianPhraseLine(line);
-    if (phraseEntry) {
-      return phraseEntry;
-    }
-  }
-
-  const whitespaceParts = line.split(/[\s\u3000]+/u).filter(Boolean);
-  if (whitespaceParts.length >= 2) {
+  void mode;
+  const parts = line.split(/\s*(?:\/|\uFF0F)\s*/u).map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 2) {
     return {
-      word: whitespaceParts[0],
-      meaning: whitespaceParts.slice(1).join(" ")
+      word: parts[0],
+      meaning: parts[1]
     };
   }
 
-  throw new Error(label + "第 " + (index + 1) + " 行无法识别，请按“单词 中文”的格式输入。");
-}
-
-function parseRussianPhraseLine(line) {
-  const parts = line.split(/[\s\u3000]+/u).filter(Boolean);
-  if (parts.length < 3) {
-    return null;
-  }
-
-  if (!isRussianToken(parts[0]) || !isRussianToken(parts[1])) {
-    return null;
-  }
-
-  let splitIndex = 2;
-  while (splitIndex < parts.length && isRussianToken(parts[splitIndex])) {
-    splitIndex += 1;
-  }
-
-  if (splitIndex >= parts.length) {
-    return null;
-  }
-
-  return {
-    word: parts.slice(0, splitIndex).join(" "),
-    meaning: parts.slice(splitIndex).join(" ")
-  };
-}
-
-function isRussianToken(token) {
-  return /[\u0400-\u04FF\u0500-\u052F]/u.test(token);
+  throw new Error(label + "第 " + (index + 1) + " 行无法识别，请按“单词/中文”的格式输入。");
 }
 
 function clearWords() {
   if (sessionActive) {
-    showToast("请先退出当前测试，再清空词库。", "error");
+    showToast("Please exit the current test before clearing the library.", "error");
     return;
   }
 
   resetBank("english");
   resetBank("russian");
   wrongRecords.clear();
+  practiceEntries = [];
   currentQuizEntries = [];
+  currentRoundPendingEntries = [];
+  currentQuestionEntry = null;
+  currentRoundSize = 0;
   currentSelectedGroupIds = [];
+  masteredEntryKeys = new Set();
+  carryOverWrongKeys = new Set();
   activeLibraryGroupIds.english = "";
   activeLibraryGroupIds.russian = "";
   saveWords();
   refreshAllDisplays();
-  showToast("英语和俄语词库都已清空。", "success");
+  showToast("English and Russian libraries have been cleared.", "success");
 }
 
 function renderWordsView() {
@@ -1049,7 +991,7 @@ function renderWordColumn(mode, listElement, emptyElement) {
     header.className = "group-word-header";
     header.innerHTML =
       "<strong>" + escapeHtml(group.name) + "</strong>" +
-      "<span class=\"pill\">" + group.entries.length + " 组</span>";
+      "<span class=\"pill\">" + group.entries.length + "</span>";
 
     const entriesWrap = document.createElement("div");
     entriesWrap.className = "group-word-entries";
@@ -1057,7 +999,7 @@ function renderWordColumn(mode, listElement, emptyElement) {
     if (group.entries.length === 0) {
       const empty = document.createElement("div");
       empty.className = "group-empty-note";
-      empty.textContent = "这个分组还是空的。";
+      empty.textContent = "This group is empty.";
       entriesWrap.appendChild(empty);
     } else {
       group.entries
@@ -1086,19 +1028,19 @@ function renderWordColumn(mode, listElement, emptyElement) {
 
 function deleteWordEntry(mode, groupId, entryId) {
   if (sessionActive) {
-    showToast("请先退出当前测试，再修改词库。", "error");
+    showToast("Please exit the current test before editing the library.", "error");
     return;
   }
 
   const group = findGroup(mode, groupId);
   if (!group) {
-    showToast("没有找到目标分组。", "error");
+    showToast("Target group not found.", "error");
     return;
   }
 
   const index = group.entries.findIndex((entry) => entry.id === entryId);
   if (index === -1) {
-    showToast("没有找到要删除的词条。", "error");
+    showToast("Entry to delete was not found.", "error");
     return;
   }
 
@@ -1112,12 +1054,12 @@ function deleteWordEntry(mode, groupId, entryId) {
   wrongRecords.delete(getWrongRecordKey(entry));
   saveWords();
   refreshAllDisplays();
-  showToast("已删除 1 组" + wordBanks[mode].label + "单词。", "success");
+  showToast("Deleted 1 " + wordBanks[mode].label + " entry.", "success");
 }
 
 function deleteGroup(mode, groupId) {
   if (sessionActive) {
-    showToast("请先退出当前测试，再修改词库。", "error");
+    showToast("Please exit the current test before editing the library.", "error");
     return;
   }
 
@@ -1128,7 +1070,7 @@ function deleteGroup(mode, groupId) {
   }
 
   const group = groups[index];
-  const confirmed = window.confirm("要删除这个分组吗？\n\n" + group.name + "\n\n分组里的单词也会一起删除。");
+  const confirmed = window.confirm("Delete this group?\n\n" + group.name + "\n\nAll words in this group will also be deleted.");
   if (!confirmed) {
     return;
   }
@@ -1172,7 +1114,7 @@ function loadSavedWords() {
       }
     }
   } catch (error) {
-    console.warn("读取词库失败：", error);
+    console.warn("Failed to load word library:", error);
   } finally {
     ensureValidActiveGroup("english");
     ensureValidActiveGroup("russian");
@@ -1249,7 +1191,7 @@ function syncGroupSelect(mode, selectElement) {
   groups.forEach((group) => {
     const option = document.createElement("option");
     option.value = group.id;
-    option.textContent = group.name + "（" + group.entries.length + "）";
+    option.textContent = group.name + " (" + group.entries.length + ")";
     selectElement.appendChild(option);
   });
 
@@ -1263,7 +1205,7 @@ function renderGroupPreview(mode, container) {
   if (groups.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "还没有分组，先创建一个再往里面加单词。";
+    empty.textContent = "No groups yet. Create one first and then add words.";
     container.appendChild(empty);
     return;
   }
@@ -1280,7 +1222,7 @@ function renderGroupPreview(mode, container) {
     meta.className = "group-preview-meta";
     meta.innerHTML =
       "<strong>" + escapeHtml(group.name) + "</strong>" +
-      "<small>" + group.entries.length + " 组单词</small>";
+      "<small>" + group.entries.length + " entries</small>";
     meta.addEventListener("click", () => {
       setActiveLibraryGroup(mode, group.id);
     });
@@ -1403,8 +1345,14 @@ function replaceWordLibrary(payload) {
   resetBank("english");
   resetBank("russian");
   wrongRecords.clear();
+  practiceEntries = [];
   currentQuizEntries = [];
+  currentRoundPendingEntries = [];
+  currentQuestionEntry = null;
+  currentRoundSize = 0;
   currentSelectedGroupIds = [];
+  masteredEntryKeys = new Set();
+  carryOverWrongKeys = new Set();
 
   wordBanks.english.groups = payload.english.map(cloneGroup);
   wordBanks.russian.groups = payload.russian.map(cloneGroup);
@@ -1453,12 +1401,12 @@ function normalizeImportedModePayload(payload, label, fallbackGroupName) {
 function normalizeGroupArray(groups, label) {
   return groups.map((group, index) => {
     if (!group || typeof group !== "object") {
-      throw new Error(label + "分组第 " + (index + 1) + " 项不是有效对象。");
+      throw new Error(label + " group item " + (index + 1) + " is invalid.");
     }
 
     const name = String(group.name || "").trim();
     if (!name) {
-      throw new Error(label + "分组第 " + (index + 1) + " 项缺少名称。");
+      throw new Error(label + " group item " + (index + 1) + " is missing a name.");
     }
 
     return {
@@ -1472,13 +1420,13 @@ function normalizeGroupArray(groups, label) {
 function normalizeEntryArray(entries, label) {
   return entries.map((item, index) => {
     if (!item || typeof item !== "object") {
-      throw new Error(label + "词库第 " + (index + 1) + " 项不是有效对象。");
+      throw new Error(label + " entry " + (index + 1) + " is invalid.");
     }
 
     const word = String(item.word || "").trim();
     const meaning = String(item.meaning || "").trim();
     if (!word || !meaning) {
-      throw new Error(label + "词库第 " + (index + 1) + " 项缺少 word 或 meaning。");
+      throw new Error(label + " entry " + (index + 1) + " is missing word or meaning.");
     }
 
     return {
@@ -1533,6 +1481,71 @@ function playQuestionReveal() {
 
 function getUniqueMeaningCountFromEntries(entries) {
   return new Set(entries.map((entry) => entry.meaning)).size;
+}
+
+function hasSufficientQuizEntries(entries) {
+  return entries.length >= 2 && getUniqueMeaningCountFromEntries(entries) >= 2;
+}
+
+function getRemainingPracticeEntries() {
+  return practiceEntries.filter((entry) => !masteredEntryKeys.has(getEntryKey(entry)));
+}
+
+function hasNextRoundAvailable() {
+  return hasSufficientQuizEntries(getRemainingPracticeEntries());
+}
+
+function buildRoundEntries(availableEntries) {
+  const carryEntries = [];
+  const freshEntries = [];
+
+  availableEntries.forEach((entry) => {
+    if (carryOverWrongKeys.has(getEntryKey(entry))) {
+      carryEntries.push(entry);
+      return;
+    }
+
+    freshEntries.push(entry);
+  });
+
+  shuffleArray(carryEntries);
+  shuffleArray(freshEntries);
+
+  const roundEntries = [];
+  const selectedKeys = new Set();
+
+  [carryEntries, freshEntries].forEach((collection) => {
+    collection.forEach((entry) => {
+      const key = getEntryKey(entry);
+      if (roundEntries.length >= ROUND_SIZE || selectedKeys.has(key)) {
+        return;
+      }
+
+      roundEntries.push(entry);
+      selectedKeys.add(key);
+    });
+  });
+
+  if (getUniqueMeaningCountFromEntries(roundEntries) >= 2 || roundEntries.length < 2) {
+    return roundEntries;
+  }
+
+  const fallbackEntry = availableEntries.find((entry) => (
+    !selectedKeys.has(getEntryKey(entry)) &&
+    entry.meaning !== roundEntries[0].meaning
+  ));
+
+  if (!fallbackEntry) {
+    return roundEntries;
+  }
+
+  if (roundEntries.length < ROUND_SIZE) {
+    roundEntries.push(fallbackEntry);
+    return roundEntries;
+  }
+
+  roundEntries[roundEntries.length - 1] = fallbackEntry;
+  return roundEntries;
 }
 
 function setGroupSelectorStatus(message, type) {
@@ -1602,7 +1615,7 @@ async function saveWordsToPickedFile(text) {
 
   const permission = await ensureFileHandlePermission(activeWordFileHandle);
   if (!permission) {
-    throw new Error("没有获得文件写入权限。");
+    throw new Error("File write permission was not granted.");
   }
 
   const writable = await activeWordFileHandle.createWritable();
@@ -1624,6 +1637,152 @@ async function ensureFileHandlePermission(fileHandle) {
   }
 
   return true;
+}
+
+function getDesktopBridge() {
+  if (window.shanlicDesktop?.isElectron) {
+    return window.shanlicDesktop;
+  }
+
+  try {
+    if (window.parent && window.parent !== window && window.parent.shanlicDesktop?.isElectron) {
+      return window.parent.shanlicDesktop;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function importWordsFromText(rawText, sourceInfo) {
+  try {
+    const imported = parseImportedWords(String(rawText || ""));
+    replaceWordLibrary(imported);
+    activeWordFileHandle = sourceInfo?.fileHandle || null;
+    activeWordFilePath = sourceInfo?.filePath || "";
+    showToast("Import successful.", "success");
+  } catch (error) {
+    showToast(error.message || "Import failed. Please check the JSON format.", "error");
+  }
+}
+
+async function openImportPicker() {
+  if (sessionActive) {
+    showToast("Please exit the current test before importing words.", "error");
+    return;
+  }
+
+  const desktopBridge = getDesktopBridge();
+  if (desktopBridge?.openJsonFile) {
+    try {
+      const result = await desktopBridge.openJsonFile({
+        title: "导入词库 JSON"
+      });
+      if (!result || result.canceled) {
+        return;
+      }
+
+      await importWordsFromText(String(result.text || ""), {
+        filePath: result.filePath || ""
+      });
+      return;
+    } catch (error) {
+      console.warn("Electron import failed, falling back to browser import:", error);
+    }
+  }
+
+  if (supportsFileSystemAccess()) {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker(JSON_FILE_PICKER_OPTIONS);
+      const file = await fileHandle.getFile();
+      await importWordsFromText(await file.text(), {
+        fileHandle
+      });
+      return;
+    } catch (error) {
+      if (isUserCancelledFilePicker(error)) {
+        return;
+      }
+      console.warn("文件选择器不可用，改为普通导入：", error);
+    }
+  }
+
+  importFileInput.value = "";
+  importFileInput.click();
+}
+
+async function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  await importWordsFromText(await file.text(), {});
+}
+
+async function exportWordsToFile() {
+  const payload = {
+    english: { groups: exportGroups("english") },
+    russian: { groups: exportGroups("russian") }
+  };
+
+  if (payload.english.groups.length === 0 && payload.russian.groups.length === 0) {
+    showToast("The library is empty, nothing to export.", "error");
+    return;
+  }
+
+  const jsonText = JSON.stringify(payload, null, 2);
+  const desktopBridge = getDesktopBridge();
+
+  if (desktopBridge?.saveJsonFile) {
+    try {
+      const result = await desktopBridge.saveJsonFile({
+        title: "导出词库 JSON",
+        suggestedName: "words.json",
+        filePath: activeWordFilePath,
+        text: jsonText
+      });
+
+      if (!result || result.canceled) {
+        return;
+      }
+
+      activeWordFilePath = result.filePath || "";
+      showToast("Saved to a local JSON file.", "success");
+      return;
+    } catch (error) {
+      console.warn("Electron export failed, falling back to browser export:", error);
+    }
+  }
+
+  if (supportsFileSystemAccess()) {
+    try {
+      await saveWordsToPickedFile(jsonText);
+      showToast("Saved to the selected JSON file.", "success");
+      return;
+    } catch (error) {
+      if (isUserCancelledFilePicker(error)) {
+        return;
+      }
+      console.warn("直接写入文件失败，改为下载导出：", error);
+    }
+  }
+
+  const blob = new Blob([jsonText], {
+    type: "application/json;charset=utf-8"
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "words.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  showToast("Exported as words.json.", "success");
 }
 
 function generateId(prefix) {
@@ -1659,3 +1818,4 @@ function deleteTextAtCursor(input) {
   input.setSelectionRange(start - 1, start);
   insertTextAtCursor(input, "");
 }
+

@@ -6,18 +6,18 @@
   <title>SHANNON 六级速记单词</title>
   <style>
     :root {
-      --bg-1: #f6efe1;
-      --bg-2: #eadcc7;
-      --panel: rgba(255, 250, 241, 0.92);
-      --panel-strong: #fffaf2;
-      --line: rgba(60, 42, 20, 0.1);
+      --bg-1: #fff7e4;
+      --bg-2: #f7ebc8;
+      --panel: rgba(255, 251, 240, 0.92);
+      --panel-strong: #fffaf0;
+      --line: rgba(120, 90, 24, 0.12);
       --ink: #1f2933;
       --muted: #6a737d;
-      --accent: #ca7a17;
-      --accent-deep: #8b4513;
+      --accent: #d8b86a;
+      --accent-deep: #9f7f38;
       --success: #2f8f5b;
       --error: #b42318;
-      --shadow: 0 24px 70px rgba(84, 50, 17, 0.14);
+      --shadow: 0 24px 70px rgba(159, 127, 56, 0.16);
       --radius-xl: 34px;
       --radius-lg: 24px;
       --radius-md: 18px;
@@ -37,8 +37,10 @@
       font-family: "Trebuchet MS", "Segoe UI", "Microsoft YaHei", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(248, 197, 86, 0.28), transparent 24%),
-        radial-gradient(circle at bottom right, rgba(217, 119, 6, 0.16), transparent 28%),
+        radial-gradient(circle at 12% 18%, rgba(239, 216, 170, 0.4), transparent 24%),
+        radial-gradient(circle at 88% 14%, rgba(255, 241, 206, 0.86), transparent 28%),
+        radial-gradient(circle at 14% 84%, rgba(216, 184, 106, 0.24), transparent 22%),
+        radial-gradient(circle at 84% 82%, rgba(216, 184, 106, 0.18), transparent 24%),
         linear-gradient(145deg, var(--bg-1), var(--bg-2));
       padding: 22px;
     }
@@ -59,7 +61,7 @@
       height: 280px;
       top: -80px;
       right: -70px;
-      background: rgba(250, 204, 21, 0.14);
+      background: rgba(239, 216, 170, 0.58);
     }
 
     body::after {
@@ -67,7 +69,7 @@
       height: 240px;
       bottom: -60px;
       left: -60px;
-      background: rgba(234, 88, 12, 0.1);
+      background: rgba(216, 184, 106, 0.24);
     }
 
     .app {
@@ -1765,7 +1767,7 @@
               <label for="englishGroupSelect">当前分组</label>
               <select id="englishGroupSelect"></select>
             </div>
-            <textarea id="englishEntryInput" placeholder="apple 苹果&#10;banana 香蕉&#10;beautiful 美丽的"></textarea>
+            <textarea id="englishEntryInput" placeholder="apple/苹果&#10;banana/香蕉&#10;beautiful/美丽的"></textarea>
             <div class="toolbar">
               <button id="englishAddBtn" class="primary-btn" type="button">加入当前分组</button>
             </div>
@@ -1782,8 +1784,8 @@
               <label for="russianGroupSelect">当前分组</label>
               <select id="russianGroupSelect"></select>
             </div>
-            <textarea id="russianEntryInput" lang="ru" spellcheck="false" placeholder="привет 你好&#10;доброе утро 早上好&#10;как дела 你好吗"></textarea>
-            <div class="helper-note keyboard-note">可直接点下面的俄语键盘输入单词；如果空格后面还是俄语，会自动按俄语词组继续识别，直到后面接中文释义。</div>
+            <textarea id="russianEntryInput" lang="ru" spellcheck="false" placeholder="привет/你好&#10;доброе утро/早上好&#10;как дела/你好吗"></textarea>
+            <div class="helper-note keyboard-note">可直接点下面的俄语键盘输入；请按“俄语/中文”格式录入，每行一条。</div>
             <div id="russianKeyboard" class="keyboard-panel" aria-label="俄语键盘"></div>
             <div class="toolbar">
               <button id="russianAddBtn" class="primary-btn" type="button">加入当前分组</button>
