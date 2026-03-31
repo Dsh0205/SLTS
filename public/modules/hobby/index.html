@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HABIT TRACKER</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="tracker-card">
+      <div class="tracker-toolbar">
+        <div class="tracker-title">
+          <p class="tracker-kicker">HOBBY TRACKER</p>
+          <h1>LIFE TRACKER</h1>
+        </div>
+
+        <div class="tracker-actions">
+          <div class="inline-field">
+            <input id="hobbyNameInput" type="text" maxlength="24" placeholder="新增爱好">
+            <button id="addHobbyBtn" type="button">添加爱好</button>
+          </div>
+          <button id="resetMonthBtn" class="ghost-btn" type="button">清空本月爱好</button>
+        </div>
+      </div>
+
+      <div class="tracker-meta">
+        <article class="meta-pill">
+          <span>爱好列</span>
+          <strong id="hobbyCountValue">0</strong>
+        </article>
+        <article class="meta-pill">
+          <span>本月完成</span>
+          <strong id="completedCountValue">0</strong>
+        </article>
+      </div>
+
+      <div class="table-scroll">
+        <table class="tracker-table">
+          <thead id="trackerHead"></thead>
+          <tbody id="trackerBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

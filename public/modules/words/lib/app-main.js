@@ -1,4 +1,4 @@
-import { addEntriesToGroup, collectEntriesFromGroups as collectEntriesFromGroupsInGroups, createNamedGroup, cloneGroup as cloneGroupFromLibrary, ensureValidActiveGroupId, findEntryInGroup, findGroup as findGroupInGroups, parseImportedWordsText, removeEntryFromGroup, removeGroup } from "./library.js";
+import { addEntriesToGroup, collectEntriesFromGroups as collectEntriesFromGroupsInGroups, createNamedGroup, cloneGroup as cloneGroupFromLibrary, ensureValidActiveGroupId, findEntryInGroup, findGroup as findGroupInGroups, removeEntryFromGroup, removeGroup } from "./library.js";
 import { deleteTextAtCursor as deleteTextAtCursorInInput, insertTextAtCursor as insertTextAtCursorInInput } from "./input.js";
 import { parseManualEntries as parseManualEntriesFromManual } from "./manual.js";
 import { buildOptionItems as buildOptionItemsFromQuiz, buildRoundEntries as buildRoundEntriesForRound, getEntryKey as getEntryKeyFromQuiz, getRemainingPracticeEntries as getRemainingPracticeEntriesForPractice, getWrongRecordKey as getWrongRecordKeyFromQuiz, hasNextRoundAvailable as hasNextRoundAvailableForPractice, hasSufficientQuizEntries as hasSufficientQuizEntriesFromQuiz, pickQuestionEntry as pickQuestionEntryForQuiz, shuffleArray as shuffleArrayFromQuiz } from "./quiz.js";
@@ -651,14 +651,6 @@ function finishPracticeLoop() {
   exitQuiz();
 }
 
-function parseImportedWords(rawText) {
-  return parseImportedWordsText(rawText, {
-    importedGroupName: IMPORTED_GROUP_NAME,
-    englishLabel: "英语",
-    russianLabel: "俄语",
-  });
-}
-
 function getModeLabel(mode) { return wordBanks[mode].label; }
 
 function getActiveGroup(mode) { return findGroupInGroups(getGroups(mode), activeLibraryGroupIds[mode]); }
@@ -722,19 +714,6 @@ function addManualEntries(mode) {
   }
 
   showToast("Added " + addedCount + " " + getModeLabel(mode) + " entries.", "success");
-}
-
-function parseManualLine(line, index, mode, label) {
-  void mode;
-  const parts = line.split(/\s*(?:\/|\uFF0F)\s*/u).map((part) => part.trim()).filter(Boolean);
-  if (parts.length === 2) {
-    return {
-      word: parts[0],
-      meaning: parts[1]
-    };
-  }
-
-  throw new Error(label + "第 " + (index + 1) + " 行无法识别，请按“单词/中文”的格式输入。");
 }
 
 function clearWords() {
@@ -983,114 +962,32 @@ async function openImportPicker() {
     fileInput: importFileInput,
     onImportText: importWordsFromText,
   });
-  return;
-
-  const desktopBridge = resolveDesktopBridgeFromFiles();
-  if (desktopBridge?.openJsonFile) {
-    try {
-      const result = await desktopBridge.openJsonFile({
-        title: "导入词库 JSON"
-      });
-      if (!result || result.canceled) {
-        return;
-      }
-
-      await importWordsFromText(String(result.text || ""), {
-        filePath: result.filePath || ""
-      });
-      return;
-    } catch (error) {
-      console.warn("Electron import failed, falling back to browser import:", error);
-    }
-  }
-
-  if (supportsFileSystemAccessFromFiles()) {
-    try {
-      const [fileHandle] = await window.showOpenFilePicker(JSON_FILE_PICKER_OPTIONS);
-      const file = await fileHandle.getFile();
-      await importWordsFromText(await file.text(), {
-        fileHandle
-      });
-      return;
-    } catch (error) {
-      if (isUserCancelledFilePickerFromFiles(error)) {
-        return;
-      }
-      console.warn("文件选择器不可用，改为普通导入：", error);
-    }
-  }
-
-  importFileInput.value = "";
-  importFileInput.click();
 }
 
-async function handleImportFile(event) { const file = event.target.files[0]; if (!file) return; await importWordsFromText(await file.text(), {}); }
+async function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
 
-async function exportWordsToFile() {
-  await exportWordsPayload(buildWordLibraryPayloadFromStorage({
+  await importWordsFromText(await file.text(), {});
+}
+
+function buildCurrentLibraryPayload() {
+  return buildWordLibraryPayloadFromStorage({
     english: getGroups("english"),
     russian: getGroups("russian"),
-  }), {
+  });
+}
+
+async function exportWordsToFile() {
+  await exportWordsPayload(buildCurrentLibraryPayload(), {
     pickerOptions: JSON_FILE_PICKER_OPTIONS,
     activeFileHandle: activeWordFileHandle,
     activeFilePath: activeWordFilePath,
     setFileContext: updateWordFileContext,
     showToast,
   });
-  return;
-
-  const payload = buildWordLibraryPayloadFromStorage({
-    english: getGroups("english"),
-    russian: getGroups("russian"),
-  });
-
-  if (payload.english.groups.length === 0 && payload.russian.groups.length === 0) {
-    showToast("The library is empty, nothing to export.", "error");
-    return;
-  }
-
-  const jsonText = JSON.stringify(payload, null, 2);
-  const desktopBridge = resolveDesktopBridgeFromFiles();
-
-  if (desktopBridge?.saveJsonFile) {
-    try {
-      const result = await desktopBridge.saveJsonFile({
-        title: "导出词库 JSON",
-        suggestedName: "words.json",
-        filePath: activeWordFilePath,
-        text: jsonText
-      });
-
-      if (!result || result.canceled) {
-        return;
-      }
-
-      activeWordFilePath = result.filePath || "";
-      showToast("Saved to a local JSON file.", "success");
-      return;
-    } catch (error) {
-      console.warn("Electron export failed, falling back to browser export:", error);
-    }
-  }
-
-  if (supportsFileSystemAccessFromFiles()) {
-    try {
-      activeWordFileHandle = await saveTextToPickedFile(activeWordFileHandle, jsonText, {
-        ...JSON_FILE_PICKER_OPTIONS,
-        suggestedName: "words.json",
-      });
-      showToast("Saved to the selected JSON file.", "success");
-      return;
-    } catch (error) {
-      if (isUserCancelledFilePickerFromFiles(error)) {
-        return;
-      }
-      console.warn("直接写入文件失败，改为下载导出：", error);
-    }
-  }
-
-  downloadTextFile(jsonText, "words.json", "application/json;charset=utf-8");
-  showToast("Exported as words.json.", "success");
 }
 
 function blockIfSessionActive(action) { if (!sessionActive) return false; showToast("Please exit the current test before " + action + ".", "error"); return true; }

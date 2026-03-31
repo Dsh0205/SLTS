@@ -1,32 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron')
-
-const STORAGE_MANIFEST = [
-  {
-    moduleId: 'notes',
-    pathSuffix: '/modules/notes/index.html',
-    keys: ['shanlic_notes'],
-  },
-  {
-    moduleId: 'notes',
-    pathSuffix: '/modules/notes/floating.html',
-    keys: ['shanlic_notes'],
-  },
-  {
-    moduleId: 'flight',
-    pathSuffix: '/modules/flight/index.html',
-    keys: ['entries-v1', 'entries-invalid-v1', 'site-theme'],
-  },
-  {
-    moduleId: 'words',
-    pathSuffix: '/modules/words/index.html',
-    keys: ['word-practice-data-v2'],
-  },
-  {
-    moduleId: 'comic',
-    pathSuffix: '/modules/comic/index.html',
-    keys: ['entries-manga-v1', 'entries-manga-invalid-v1'],
-  },
-]
+const { STORAGE_MANIFEST } = require('./lib/storage-manifest.cjs')
 
 function normalizePathname(pathname) {
   return pathname.replace(/\\/g, '/')
@@ -161,6 +134,29 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   },
   setAutoLaunch(enabled) {
     return ipcRenderer.invoke('desktop-settings:set-auto-launch', enabled)
+  },
+  getUpdateState() {
+    return ipcRenderer.invoke('desktop-updater:get-state')
+  },
+  checkForUpdates() {
+    return ipcRenderer.invoke('desktop-updater:check')
+  },
+  installUpdate() {
+    return ipcRenderer.invoke('desktop-updater:install')
+  },
+  onUpdateStateChange(callback) {
+    if (typeof callback !== 'function') {
+      return () => {}
+    }
+
+    const listener = (_event, payload) => {
+      callback(payload)
+    }
+
+    ipcRenderer.on('desktop-updater:state', listener)
+    return () => {
+      ipcRenderer.removeListener('desktop-updater:state', listener)
+    }
   },
   onFloatingNotesSelect(callback) {
     if (typeof callback !== 'function') {

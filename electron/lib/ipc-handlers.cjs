@@ -10,6 +10,7 @@ function registerDesktopIpcHandlers({
   windows,
   getAutoLaunchState,
   setAutoLaunchEnabled,
+  updater,
 }) {
   ipcMain.on('desktop-storage:load-sync', (event, moduleId) => {
     event.returnValue = {
@@ -193,6 +194,41 @@ function registerDesktopIpcHandlers({
   ipcMain.handle('desktop-settings:set-auto-launch', (_event, enabled) => {
     setAutoLaunchEnabled(Boolean(enabled))
     return getAutoLaunchState()
+  })
+
+  ipcMain.handle('desktop-updater:get-state', () => {
+    return updater?.getState?.() ?? {
+      supported: false,
+      status: 'unsupported',
+      message: '自动更新当前不可用。',
+    }
+  })
+
+  ipcMain.handle('desktop-updater:check', async () => {
+    if (!updater?.checkForUpdates) {
+      return {
+        supported: false,
+        status: 'unsupported',
+        message: '自动更新当前不可用。',
+      }
+    }
+
+    return updater.checkForUpdates()
+  })
+
+  ipcMain.handle('desktop-updater:install', () => {
+    if (!updater?.quitAndInstall) {
+      return {
+        started: false,
+        state: {
+          supported: false,
+          status: 'unsupported',
+          message: '自动更新当前不可用。',
+        },
+      }
+    }
+
+    return updater.quitAndInstall()
   })
 
   ipcMain.handle('desktop-windows:open-floating-notes', (_event, noteId) => {

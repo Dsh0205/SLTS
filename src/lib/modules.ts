@@ -1,4 +1,4 @@
-export type ModuleKey = 'notes' | 'lottery' | 'flight' | 'words' | 'quadrant'
+export type ModuleKey = 'notes' | 'lottery' | 'flight' | 'words' | 'quadrant' | 'hobby'
 
 export interface ModuleDefinition {
   key: ModuleKey
@@ -29,7 +29,7 @@ function createModule(
   return { key, title, subtitle, color, colorSoft, publicEntry, orbit }
 }
 
-export const modules: ModuleDefinition[] = [
+export const orbitModules: ModuleDefinition[] = [
   createModule('notes', '\u7b14\u8bb0\u7cfb\u7edf', '\u8bb0\u5f55\u4e0e\u521b\u4f5c', '#9b6dff', '#d8c3ff', 'modules/notes/index.html', {
     size: '220px',
     duration: '22s',
@@ -60,6 +60,26 @@ export const modules: ModuleDefinition[] = [
     delay: '-9s',
     rotation: '12deg',
   }),
+]
+
+export const centerModule: ModuleDefinition = createModule(
+  'hobby',
+  '\u7231\u597d\u8ffd\u8e2a\u8868',
+  '\u6708\u5ea6\u8bb0\u5f55\u4e0e\u6253\u5361',
+  '#ff9b32',
+  '#ffd08a',
+  'modules/hobby/index.html',
+  {
+    size: '0px',
+    duration: '0s',
+    delay: '0s',
+    rotation: '0deg',
+  },
+)
+
+export const modules: ModuleDefinition[] = [
+  ...orbitModules,
+  centerModule,
 ]
 
 export const modulesByKey = Object.fromEntries(

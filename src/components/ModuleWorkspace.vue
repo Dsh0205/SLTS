@@ -12,6 +12,7 @@ const emit = defineEmits<{
 
 const frameKey = ref(0)
 const frameSrc = computed(() => props.module.publicEntry)
+const isWarmWorkspace = computed(() => props.module.key === 'hobby')
 const workspaceStyle = computed(() => ({
   '--module-color': props.module.color,
   '--module-color-soft': props.module.colorSoft
@@ -33,7 +34,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="workspace-shell" :style="workspaceStyle">
+  <section class="workspace-shell" :class="{ 'workspace-shell--warm': isWarmWorkspace }" :style="workspaceStyle">
     <button
       class="back-button"
       type="button"
@@ -59,6 +60,13 @@ onBeforeUnmount(() => {
     radial-gradient(circle at top center, color-mix(in srgb, var(--module-color-soft) 34%, transparent), transparent 30%),
     radial-gradient(circle at bottom right, color-mix(in srgb, var(--module-color) 18%, transparent), transparent 34%),
     linear-gradient(180deg, color-mix(in srgb, var(--module-color) 18%, #050914), color-mix(in srgb, var(--module-color) 10%, #050914));
+}
+
+.workspace-shell--warm {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--module-color-soft) 52%, white 22%), transparent 28%),
+    radial-gradient(circle at bottom center, color-mix(in srgb, var(--module-color) 34%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, var(--module-color-soft) 76%, white 10%), var(--module-color));
 }
 
 .back-button {
@@ -116,6 +124,10 @@ onBeforeUnmount(() => {
   height: 100vh;
   border: 0;
   background: color-mix(in srgb, var(--module-color-soft) 24%, #ffffff);
+}
+
+.workspace-shell--warm .workspace-frame {
+  background: color-mix(in srgb, var(--module-color-soft) 56%, #fff6ea);
 }
 
 @media (max-width: 640px) {

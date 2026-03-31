@@ -5,9 +5,13 @@ import type PortalSettingsPanel from './portal/PortalSettingsPanel.vue'
 import PortalOrbitSceneView from './portal/PortalOrbitScene.vue'
 import PortalSettingsPanelView from './portal/PortalSettingsPanel.vue'
 import { usePortalAnimation } from './portal/usePortalAnimation'
+import { usePortalMusic } from './portal/usePortalMusic'
 import type { ModuleDefinition, ModuleKey } from '../lib/modules'
 
-const props = defineProps<{ modules: ModuleDefinition[] }>()
+const props = defineProps<{
+  modules: ModuleDefinition[]
+  centerModule: ModuleDefinition
+}>()
 const emit = defineEmits<{ openModule: [moduleKey: ModuleKey] }>()
 
 type DesktopBridge = {
@@ -16,10 +20,23 @@ type DesktopBridge = {
   importBackup?: () => Promise<{ canceled?: boolean, moduleCount?: number } | null>
   getAutoLaunch?: () => Promise<{ supported?: boolean, enabled?: boolean } | null>
   setAutoLaunch?: (enabled: boolean) => Promise<{ supported?: boolean, enabled?: boolean } | null>
+  getUpdateState?: () => Promise<DesktopUpdateState | null>
+  checkForUpdates?: () => Promise<DesktopUpdateState | null>
+  installUpdate?: () => Promise<{ started?: boolean, state?: DesktopUpdateState | null } | null>
+  onUpdateStateChange?: (callback: (state: DesktopUpdateState | null) => void) => (() => void)
 }
 
 type SettingsPanelExpose = InstanceType<typeof PortalSettingsPanel>
 type OrbitSceneExpose = InstanceType<typeof PortalOrbitScene>
+type DesktopUpdateState = {
+  supported?: boolean
+  status?: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error' | 'unsupported'
+  version?: string | null
+  availableVersion?: string | null
+  downloadedVersion?: string | null
+  progressPercent?: number
+  message?: string
+}
 
 const desktopBridge = ref<DesktopBridge | null>(null)
 const settingsPanelRef = ref<SettingsPanelExpose | null>(null)
@@ -32,6 +49,12 @@ const settingsOpen = ref(false)
 const backupBusy = ref(false)
 const startupBusy = ref(false)
 const launchAtStartupEnabled = ref(false)
+const desktopUpdateState = ref<DesktopUpdateState>({
+  supported: false,
+  status: 'unsupported',
+  progressPercent: 0,
+  message: '自动更新仅在打包安装后的桌面版中可用。',
+})
 const desktopActionMessage = ref('')
 const desktopActionTone = ref<'info' | 'success' | 'error'>('info')
 
@@ -42,13 +65,57 @@ const nodeRefs = new Map<ModuleKey, HTMLButtonElement>()
 let pointerX = 0
 let pointerY = 0
 let trackingFrame = 0
+let removeUpdateStateListener = () => {}
+const HOVER_SNAP_DISTANCE = 110
+const HOVER_RELEASE_DISTANCE = 146
+const HOVER_SWITCH_ADVANTAGE = 16
 
 const stageStyle = computed(() => ({
   '--scene-zoom': zoom.value.toFixed(3),
 }))
 
+const launchableModules = computed(() => [
+  ...props.modules,
+  props.centerModule,
+])
+
 const isDesktop = computed(() => Boolean(desktopBridge.value?.isElectron))
-const hoveredModule = computed(() => props.modules.find((module) => module.key === hoveredKey.value) ?? null)
+const hoveredModule = computed(() => launchableModules.value.find((module) => module.key === hoveredKey.value) ?? null)
+const updateSupported = computed(() => Boolean(desktopUpdateState.value.supported))
+const updateActionBusy = computed(() => {
+  const status = desktopUpdateState.value.status
+  return status === 'checking' || status === 'downloading'
+})
+const updateButtonLabel = computed(() => {
+  const status = desktopUpdateState.value.status
+
+  if (!isDesktop.value) {
+    return '桌面版可用'
+  }
+
+  if (!updateSupported.value || status === 'unsupported') {
+    return '打包后可用'
+  }
+
+  if (status === 'checking') {
+    return '正在检查更新...'
+  }
+
+  if (status === 'downloading') {
+    return `正在下载更新 ${desktopUpdateState.value.progressPercent ?? 0}%`
+  }
+
+  if (status === 'downloaded') {
+    return '立即安装更新'
+  }
+
+  if (status === 'available') {
+    return '正在准备下载...'
+  }
+
+  return '检查更新'
+})
+const updateStatusText = computed(() => desktopUpdateState.value.message ?? '')
 
 const cardStyle = computed(() => ({
   left: `${cardPosition.x}px`,
@@ -89,13 +156,71 @@ const {
   sunTintStyle,
   sunTransitionActive,
 } = usePortalAnimation({
-  modules: props.modules,
+  modules: launchableModules.value,
   getSunCoreElement,
   getReflowElement: getStageElement,
   onLaunchComplete(moduleKey) {
     emit('openModule', moduleKey)
   },
 })
+
+const {
+  importTracks,
+  musicLabel,
+  musicTracks,
+  removeTrack,
+  selectedTrackId,
+  selectTrack,
+} = usePortalMusic()
+
+async function handleSelectMusic(trackId: string | null) {
+  try {
+    await selectTrack(trackId)
+
+    if (!trackId) {
+      setDesktopMessage('已停止播放，音乐文件仍保存在当前浏览器中。', 'info')
+      return
+    }
+
+    const track = musicTracks.value.find((item) => item.id === trackId)
+    setDesktopMessage(`已切换到：${track?.name ?? '所选音乐'}。之后重新打开主页时会自动尝试播放。`, 'success')
+  } catch (error) {
+    console.error(error)
+    setDesktopMessage('切换音乐失败，请稍后再试。', 'error')
+  }
+}
+
+async function handleImportMusic(files: File[]) {
+  try {
+    await importTracks(files)
+
+    const importedMp3Count = files.filter((file) => {
+      const lowerName = file.name.toLowerCase()
+      return file.type === 'audio/mpeg' || lowerName.endsWith('.mp3')
+    }).length
+
+    if (importedMp3Count === 0) {
+      setDesktopMessage('没有识别到 MP3 文件，请重新选择。', 'error')
+      return
+    }
+
+    setDesktopMessage(`已导入 ${importedMp3Count} 首音乐，文件会保存在当前浏览器中，之后打开主页会自动尝试播放。`, 'success')
+  } catch (error) {
+    console.error(error)
+    setDesktopMessage('导入音乐失败，请稍后再试。', 'error')
+  }
+}
+
+async function handleRemoveMusic(trackId: string) {
+  try {
+    const track = musicTracks.value.find((item) => item.id === trackId)
+    await removeTrack(trackId)
+    setDesktopMessage(`已删除：${track?.name ?? '所选音乐'}。`, 'info')
+  } catch (error) {
+    console.error(error)
+    setDesktopMessage('删除音乐失败，请稍后再试。', 'error')
+  }
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -143,20 +268,28 @@ function clearHovered(moduleKey?: ModuleKey) {
   connector.length = 0
 }
 
-function findNearestNode(clientX: number, clientY: number): { key: ModuleKey, node: HTMLButtonElement } | null {
-  let nearest: { key: ModuleKey, node: HTMLButtonElement } | null = null
+function getNodeDistance(node: HTMLButtonElement, clientX: number, clientY: number) {
+  const rect = node.getBoundingClientRect()
+  return Math.hypot(rect.left + rect.width / 2 - clientX, rect.top + rect.height / 2 - clientY)
+}
+
+function findNearestNode(
+  clientX: number,
+  clientY: number,
+  maxDistance = HOVER_SNAP_DISTANCE,
+): { key: ModuleKey, node: HTMLButtonElement, distance: number } | null {
+  let nearest: { key: ModuleKey, node: HTMLButtonElement, distance: number } | null = null
   let nearestDistance = Number.POSITIVE_INFINITY
 
   nodeRefs.forEach((node, key) => {
-    const rect = node.getBoundingClientRect()
-    const distance = Math.hypot(rect.left + rect.width / 2 - clientX, rect.top + rect.height / 2 - clientY)
+    const distance = getNodeDistance(node, clientX, clientY)
     if (distance < nearestDistance) {
-      nearest = { key, node }
+      nearest = { key, node, distance }
       nearestDistance = distance
     }
   })
 
-  return nearestDistance <= 110 ? nearest : null
+  return nearestDistance <= maxDistance ? nearest : null
 }
 
 function getClosestPointOnRect(x: number, y: number, left: number, top: number, right: number, bottom: number) {
@@ -225,8 +358,24 @@ function updateHoverGeometry() {
 
 function trackNearestNode() {
   if (pointerInside.value && !launchingKey.value) {
-    const nearest = findNearestNode(pointerX, pointerY)
-    if (nearest) {
+    const currentNode = hoveredKey.value ? nodeRefs.get(hoveredKey.value) ?? null : null
+    const currentDistance = currentNode ? getNodeDistance(currentNode, pointerX, pointerY) : Number.POSITIVE_INFINITY
+    const nearest = findNearestNode(
+      pointerX,
+      pointerY,
+      currentNode ? HOVER_RELEASE_DISTANCE : HOVER_SNAP_DISTANCE,
+    )
+    const keepCurrentHovered = Boolean(currentNode) && currentDistance <= HOVER_RELEASE_DISTANCE
+    const shouldSwitchNode = Boolean(
+      nearest
+      && hoveredKey.value
+      && nearest.key !== hoveredKey.value
+      && nearest.distance + HOVER_SWITCH_ADVANTAGE < currentDistance,
+    )
+
+    if (keepCurrentHovered && !shouldSwitchNode) {
+      updateHoverGeometry()
+    } else if (nearest && nearest.distance <= HOVER_SNAP_DISTANCE) {
       if (hoveredKey.value !== nearest.key) {
         void setHovered(nearest.key)
       } else {
@@ -248,6 +397,17 @@ function setDesktopMessage(message: string, tone: 'info' | 'success' | 'error') 
   desktopActionTone.value = tone
 }
 
+function applyDesktopUpdateState(state: DesktopUpdateState | null | undefined) {
+  if (!state) {
+    return
+  }
+
+  desktopUpdateState.value = {
+    ...desktopUpdateState.value,
+    ...state,
+  }
+}
+
 async function syncAutoLaunchState() {
   if (!desktopBridge.value?.getAutoLaunch) {
     launchAtStartupEnabled.value = false
@@ -259,6 +419,30 @@ async function syncAutoLaunchState() {
     launchAtStartupEnabled.value = Boolean(state?.enabled)
   } catch {
     launchAtStartupEnabled.value = false
+  }
+}
+
+async function syncUpdateState() {
+  if (!desktopBridge.value?.getUpdateState) {
+    desktopUpdateState.value = {
+      supported: false,
+      status: 'unsupported',
+      progressPercent: 0,
+      message: '自动更新仅在打包安装后的桌面版中可用。',
+    }
+    return
+  }
+
+  try {
+    const state = await desktopBridge.value.getUpdateState()
+    applyDesktopUpdateState(state)
+  } catch {
+    desktopUpdateState.value = {
+      supported: true,
+      status: 'error',
+      progressPercent: 0,
+      message: '读取更新状态失败，请稍后再试。',
+    }
   }
 }
 
@@ -280,6 +464,53 @@ async function toggleAutoLaunch() {
     setDesktopMessage('开机自启动设置失败，请稍后再试。', 'error')
   } finally {
     startupBusy.value = false
+  }
+}
+
+async function triggerUpdateAction() {
+  if (!desktopBridge.value?.checkForUpdates) {
+    setDesktopMessage('自动更新仅在桌面打包版中可用。', 'info')
+    return
+  }
+
+  const status = desktopUpdateState.value.status
+
+  if (status === 'checking' || status === 'downloading' || status === 'available') {
+    return
+  }
+
+  if (status === 'downloaded') {
+    try {
+      const result = await desktopBridge.value.installUpdate?.()
+      if (result?.started) {
+        setDesktopMessage('安装程序已启动，应用会退出并完成更新。', 'success')
+      } else {
+        applyDesktopUpdateState(result?.state)
+        setDesktopMessage('更新包还没有准备好，请稍后再试。', 'info')
+      }
+    } catch (error) {
+      console.error(error)
+      setDesktopMessage('安装更新失败，请稍后再试。', 'error')
+    }
+    return
+  }
+
+  setDesktopMessage('正在检查更新...', 'info')
+
+  try {
+    const state = await desktopBridge.value.checkForUpdates()
+    applyDesktopUpdateState(state)
+
+    if (state?.status === 'up-to-date') {
+      setDesktopMessage(state.message ?? '当前已是最新版本。', 'success')
+    } else if (state?.status === 'error') {
+      setDesktopMessage(state.message ?? '检查更新失败，请稍后再试。', 'error')
+    } else if (state?.status === 'available' || state?.status === 'downloading' || state?.status === 'downloaded') {
+      setDesktopMessage(state.message ?? '发现新版本，正在处理更新。', 'success')
+    }
+  } catch (error) {
+    console.error(error)
+    setDesktopMessage('检查更新失败，请稍后再试。', 'error')
   }
 }
 
@@ -363,6 +594,10 @@ function handleResize() {
 onMounted(() => {
   desktopBridge.value = (window as Window & { shanlicDesktop?: DesktopBridge }).shanlicDesktop ?? null
   void syncAutoLaunchState()
+  void syncUpdateState()
+  removeUpdateStateListener = desktopBridge.value?.onUpdateStateChange?.((state) => {
+    applyDesktopUpdateState(state)
+  }) ?? (() => {})
   window.addEventListener('resize', handleResize)
   window.addEventListener('scroll', handleResize, { passive: true })
   window.addEventListener('pointerdown', handleWindowPointerDown)
@@ -375,6 +610,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleResize)
   window.removeEventListener('pointerdown', handleWindowPointerDown)
   window.removeEventListener('keydown', handleWindowKeydown)
+  removeUpdateStateListener()
   clearLaunchTimers()
   resetLaunchState()
   window.cancelAnimationFrame(trackingFrame)
@@ -390,18 +626,30 @@ onBeforeUnmount(() => {
       :startup-busy="startupBusy"
       :backup-busy="backupBusy"
       :launch-at-startup-enabled="launchAtStartupEnabled"
+      :update-supported="updateSupported"
+      :update-busy="updateActionBusy"
+      :update-button-label="updateButtonLabel"
+      :update-status-text="updateStatusText"
       :message="desktopActionMessage"
       :tone="desktopActionTone"
+      :music-tracks="musicTracks"
+      :selected-music-id="selectedTrackId"
       @toggle="toggleSettings"
+      @trigger-update-action="triggerUpdateAction"
       @toggle-auto-launch="toggleAutoLaunch"
       @export-backup="exportDesktopBackup"
       @import-backup="importDesktopBackup"
+      @select-music="handleSelectMusic"
+      @import-music="handleImportMusic"
+      @remove-music="handleRemoveMusic"
     />
 
     <PortalOrbitSceneView
       ref="orbitSceneRef"
       :modules="props.modules"
+      :center-module="props.centerModule"
       :stage-style="stageStyle"
+      :music-label="musicLabel"
       :hovered-key="hoveredKey"
       :hovered-module="hoveredModule"
       :launching-key="launchingKey"

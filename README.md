@@ -7,8 +7,9 @@
 - 笔记系统
 - 抽奖转盘
 - 航班查询
-- 漫画查询
 - 单词系统
+- 四象限图
+- 爱好追踪表
 
 ## 项目特点
 
@@ -45,8 +46,12 @@ npm run dev
 npm run dev
 npm run build
 npm run build-only
+npm run check:modules
+npm run verify
 npm run preview
 npm run type-check
+npm run desktop:dev
+npm run desktop:build
 ```
 
 命令说明：
@@ -54,8 +59,12 @@ npm run type-check
 - `npm run dev`：启动开发服务器
 - `npm run build`：先做类型检查，再打包
 - `npm run build-only`：直接执行 Vite 打包
+- `npm run check:modules`：检查模块注册、桌面存储映射与 `public/modules` 目录是否一致
+- `npm run verify`：执行一致性检查并完成构建
 - `npm run preview`：预览打包结果
 - `npm run type-check`：执行 `vue-tsc`
+- `npm run desktop:dev`：同时启动 Vite 与 Electron 桌面开发模式
+- `npm run desktop:build`：构建桌面安装包
 
 ## 部署到 GitHub Pages
 
@@ -71,8 +80,9 @@ npm run type-check
 
 之后 GitHub 会自动执行工作流：
 
+- 检查模块配置一致性
 - 安装依赖
-- 运行 `npm run build`
+- 运行 `npm run verify`
 - 发布 `dist/` 到 GitHub Pages
 
 ### 工作流文件
@@ -132,9 +142,12 @@ SHANLIC LIFE TRACKER SYSTEM
 │     ├─ notes                     # 笔记系统
 │     ├─ lottery                   # 抽奖转盘
 │     ├─ flight                    # 航班查询
-│     ├─ comic                     # 漫画查询
-│     └─ words                     # 单词系统
+│     ├─ words                     # 单词系统
+│     ├─ quadrant                  # 四象限图
+│     └─ shared                    # 模块共享样式资源
 ├─ dist                            # 打包产物
+├─ scripts
+│  └─ check-module-consistency.mjs # 模块与桌面配置一致性检查
 └─ package.json
 ```
 
@@ -282,9 +295,62 @@ word-practice-data-v2
 
 ## 维护建议
 
+## 桌面版更新与 Releases
+
+项目现在已经接入了 Electron 自动更新，并把 GitHub Releases 配成了默认更新源。
+
+- 仓库：`Dsh0205/SLTS`
+- 自动更新来源：`GitHub Releases`
+- 桌面发布命令：`npm run desktop:release`
+
+### 最省事的发布方式
+
+以后发新版本时，按这个流程就可以：
+
+1. 把 [`package.json`](./package.json) 里的 `version` 改成新版本，例如 `1.1.3`
+2. 提交代码并推到 `main`
+3. 创建对应标签，比如 `v1.1.3`
+4. 把这个标签推到 GitHub
+
+```powershell
+git add .
+git commit -m "release: v1.1.3"
+git push origin main
+git tag v1.1.3
+git push origin v1.1.3
+```
+
+仓库里的 [`release-desktop.yml`](./.github/workflows/release-desktop.yml) 会自动：
+
+- 安装依赖
+- 打包 Windows 桌面版
+- 创建或更新 GitHub Release
+- 上传自动更新所需文件
+
+### 如果你手动发 Release
+
+至少需要上传这些文件：
+
+- 安装包 `.exe`
+- `latest.yml`
+- 对应的 `.blockmap`
+
+只上传源码压缩包不够，桌面版自动更新不会读取源码包。
+
+### 用户端更新方式
+
+桌面版左上角设置里已经加入“检查更新”按钮：
+
+- 无新版本时会提示已是最新版
+- 有新版本时会自动开始下载
+- 下载完成后按钮会变成“立即安装更新”
+- 点击后应用会退出并安装新版本
+
 - 编辑中文、俄语内容时，统一使用 `UTF-8`
 - 如果某个模块只是静态页面，可继续沿用 `public/modules/...` 的组织方式
 - 如果后续某个模块交互越来越复杂，可以考虑把该模块逐步迁移到 `src/` 内部，统一纳入 Vue 组件体系
+- `public/modules` 下允许保留历史目录，但只有在 `src/lib/modules.ts` 中注册过的模块才会出现在主入口
+- 部分未注册目录可以作为辅助页面保留，例如 `comic` 当前由 `flight` 模块内链接进入，不再出现在主页模块球中
 
 ## 相关文件
 

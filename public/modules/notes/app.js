@@ -75,11 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeEditorBtn = document.getElementById('close-editor-btn');
   const emptyState = document.getElementById('empty-state');
   const panelOpenMainBtn = document.getElementById('panel-open-main-btn');
-  const panelOpenDesktopBtn = document.getElementById('panel-open-desktop-btn');
   const panelSaveBtn = document.getElementById('panel-save-btn');
   const panelTitleInput = document.getElementById('side-note-title');
   const panelContentInput = document.getElementById('side-note-content');
   const panelStatus = document.getElementById('panel-status');
+  const toast = document.getElementById('notes-toast');
 
   const btnUndo = document.getElementById('btn-undo');
   const btnRedo = document.getElementById('btn-redo');
@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const expandedNoteIds = new Set();
   const handleMainEditorChange = () => handleDraftInput('main');
+  let toastTimer = 0;
 
   marked.setOptions({
     headerIds: true,
@@ -133,25 +134,20 @@ document.addEventListener('DOMContentLoaded', () => {
     switchToEditorMode();
   });
 
-  [topDesktopBtn, panelOpenDesktopBtn].forEach((button) => {
-    if (!button) return;
-    button.addEventListener('click', () => {
-      openDesktopFloatingEditor();
-    });
+  topDesktopBtn?.addEventListener('click', () => {
+    openDesktopFloatingEditor();
   });
 
   panelSaveBtn.addEventListener('click', () => {
-    saveCurrentNote({ announce: true });
-    alert('笔记已保存。');
+    saveAndKeepEditing('panel');
   });
 
   saveMainBtn.addEventListener('click', () => {
-    saveCurrentNote({ announce: true });
+    saveAndKeepEditing('main');
   });
 
   submitBtn.addEventListener('click', () => {
-    saveCurrentNote({ announce: true });
-    alert('笔记已保存。');
+    saveAndKeepEditing('main');
   });
 
   backToViewBtn.addEventListener('click', () => {
@@ -227,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       renderNoteList(searchInput.value);
-      alert('导入成功。');
+      showToast('导入成功。');
     };
     reader.readAsText(file);
     importInput.value = '';
@@ -527,6 +523,38 @@ document.addEventListener('DOMContentLoaded', () => {
     panelStatus.textContent = text;
   }
 
+  function showToast(text) {
+    if (!toast) return;
+
+    toast.textContent = text;
+    toast.classList.add('show');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toast.classList.remove('show');
+    }, 1800);
+  }
+
+  function focusEditorField(source) {
+    const target = source === 'panel' ? panelContentInput : mainContentInput;
+    if (!(target instanceof HTMLElement)) return;
+
+    window.requestAnimationFrame(() => {
+      target.focus({ preventScroll: true });
+      if (target instanceof HTMLTextAreaElement) {
+        const end = target.value.length;
+        target.setSelectionRange(end, end);
+      }
+    });
+  }
+
+  function saveAndKeepEditing(source) {
+    const savedNote = saveCurrentNote({ announce: true });
+    if (!savedNote) return;
+
+    showToast('笔记已保存。');
+    focusEditorField(source);
+  }
+
   function getDraftStatusText() {
     const note = draftNoteId ? findNoteById(draftNoteId) : null;
 
@@ -541,12 +569,16 @@ document.addEventListener('DOMContentLoaded', () => {
       : '新笔记 · 尚未保存';
   }
 
-  function syncDraftInputs() {
+  function syncDraftInputs(excludeSource = null) {
     syncingDraftInputs = true;
-    mainTitleInput.value = draftTitle;
-    mainContentInput.value = draftContent;
-    panelTitleInput.value = draftTitle;
-    panelContentInput.value = draftContent;
+    if (excludeSource !== 'main') {
+      mainTitleInput.value = draftTitle;
+      mainContentInput.value = draftContent;
+    }
+    if (excludeSource !== 'panel') {
+      panelTitleInput.value = draftTitle;
+      panelContentInput.value = draftContent;
+    }
     syncingDraftInputs = false;
     updateStatus(getDraftStatusText());
   }
@@ -583,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
       draftContent = panelContentInput.value;
     }
 
-    syncDraftInputs();
+    syncDraftInputs(source);
   }
 
   function hasUnsavedChanges() {

@@ -1,21 +1,29 @@
 {
   "name": "shanlic-life-tracker-system",
-  "version": "1.1.2",
+  "version": "1.5.1",
   "private": true,
   "main": "electron/main.cjs",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dsh0205/SLTS.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run type-check && npm run build-only",
     "preview": "vite preview",
     "build-only": "vite build",
+    "check:modules": "node scripts/check-module-consistency.mjs",
+    "verify": "npm run check:modules && npm run build",
     "type-check": "vue-tsc --build",
     "electron": "node electron/launch.cjs .",
     "electron:dev": "wait-on tcp:127.0.0.1:5173 && node electron/launch.cjs .",
     "desktop:dev": "concurrently -k \"npm run dev -- --host 127.0.0.1 --strictPort\" \"npm run electron:dev\"",
-    "desktop:build": "npm run build && electron-builder"
+    "desktop:build": "npm run build && electron-builder",
+    "desktop:release": "npm run build && electron-builder --publish always"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "vue": "^3.5.30"
   },
   "devDependencies": {
@@ -30,8 +38,8 @@
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-vue-devtools": "^8.0.7",
-    "wait-on": "^8.0.5",
-    "vue-tsc": "^3.2.5"
+    "vue-tsc": "^3.2.5",
+    "wait-on": "^8.0.5"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
@@ -54,6 +62,13 @@
         "nsis"
       ]
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Dsh0205",
+        "repo": "SLTS"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

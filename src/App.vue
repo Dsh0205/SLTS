@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ModuleWorkspace from './components/ModuleWorkspace.vue'
 import PortalScene from './components/PortalScene.vue'
-import { modules, modulesByKey, type ModuleDefinition, type ModuleKey } from './lib/modules'
+import { centerModule, modulesByKey, orbitModules, type ModuleDefinition, type ModuleKey } from './lib/modules'
 
 const activeModuleKey = ref<ModuleKey | null>(null)
 
@@ -54,7 +54,8 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <PortalScene
       v-if="!activeModule"
-      :modules="modules"
+      :modules="orbitModules"
+      :center-module="centerModule"
       @open-module="openModule"
     />
     <ModuleWorkspace

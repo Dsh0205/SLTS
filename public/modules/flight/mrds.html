@@ -4,28 +4,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>飞机航班查询</title>
+  <title>每日大赛</title>
   <link rel="stylesheet" href="../shared/reveal.css">
   <style>
     :root {
-      --bg: #fff2f4;
-      --text: #0f1216;
-      --muted: #7f5c64;
-      --card: rgba(255, 255, 255, 0.88);
-      --border: rgba(255, 106, 120, 0.16);
-      --primary: #ff6a78;
-      --primary-contrast: #ffffff;
-      --accent: #ff9aa6;
-    }
-
-    .dark {
-      --bg: #0e1117;
-      --text: #e5e7eb;
-      --muted: #a1a1aa;
-      --card: #151822;
-      --border: #2a2f3a;
-      --primary: #3b82f6;
-      --primary-contrast: #ffffff;
+      --bg: #150d08;
+      --bg-soft: #2d180e;
+      --text: #ffe6cf;
+      --muted: #d3ab85;
+      --card: linear-gradient(180deg, rgba(35, 20, 10, 0.98), rgba(22, 13, 8, 0.96));
+      --border: rgba(255, 152, 61, 0.3);
+      --primary: #ff8f3d;
+      --primary-contrast: #1d1008;
+      --accent: #ffb15f;
+      --danger: #ff7a45;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
     }
 
     * {
@@ -34,19 +27,20 @@
 
     html,
     body {
-      height: 100%;
+      min-height: 100%;
     }
 
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, Arial, sans-serif;
-      background:
-        radial-gradient(circle at 12% 18%, rgba(255, 106, 120, 0.34), transparent 24%),
-        radial-gradient(circle at 86% 14%, rgba(255, 193, 201, 0.78), transparent 28%),
-        radial-gradient(circle at 14% 82%, rgba(255, 106, 120, 0.2), transparent 22%),
-        radial-gradient(circle at 88% 84%, rgba(255, 106, 120, 0.18), transparent 24%),
-        linear-gradient(180deg, #ffe4e9, var(--bg));
+      padding: 14px;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
       color: var(--text);
+      background:
+        radial-gradient(circle at 10% 18%, rgba(255, 143, 61, 0.22), transparent 22%),
+        radial-gradient(circle at 88% 14%, rgba(255, 200, 126, 0.18), transparent 28%),
+        radial-gradient(circle at 16% 84%, rgba(255, 143, 61, 0.16), transparent 22%),
+        radial-gradient(circle at 84% 84%, rgba(255, 143, 61, 0.14), transparent 24%),
+        linear-gradient(180deg, #1c120c 0%, #120b07 100%);
     }
 
     body::before,
@@ -56,119 +50,274 @@
       border-radius: 50%;
       pointer-events: none;
       filter: blur(10px);
-      opacity: 0.74;
+      opacity: 0.72;
     }
 
     body::before {
       width: 220px;
       height: 220px;
-      top: -70px;
-      right: -50px;
-      background: rgba(255, 106, 120, 0.24);
+      top: -72px;
+      right: -54px;
+      background: rgba(255, 143, 61, 0.16);
     }
 
     body::after {
       width: 180px;
       height: 180px;
       left: -44px;
-      bottom: -48px;
-      background: rgba(255, 193, 201, 0.72);
+      bottom: -50px;
+      background: rgba(255, 177, 95, 0.14);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    main {
+      margin-top: 16px;
+      background: linear-gradient(180deg, rgba(28, 17, 10, 0.92), rgba(18, 11, 7, 0.9));
+      border: 1px solid rgba(255, 143, 61, 0.16);
+      border-radius: 28px;
+      box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28);
     }
 
     .container {
       position: relative;
       z-index: 1;
-      max-width: 980px;
+      width: min(1080px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 24px;
     }
 
     .site-header {
       position: sticky;
-      top: 0;
-      background: rgba(255, 242, 244, 0.86);
-      border-bottom: 1px solid var(--border);
-      z-index: 10;
-      backdrop-filter: blur(12px);
+      top: 14px;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(24, 15, 10, 0.82);
+      border: 1px solid rgba(255, 143, 61, 0.18);
+      border-radius: 22px;
+    }
+
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 0;
+    }
+
+    .hero {
+      padding: 36px 0 24px;
+    }
+
+    .hero-card,
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 24px 56px rgba(0, 0, 0, 0.24),
+        inset 0 1px 0 rgba(255, 194, 132, 0.12);
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -60px -90px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 143, 61, 0.18), transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 143, 61, 0.14);
+      color: var(--accent);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
     }
 
     .site-title {
-      margin: 0;
-      font-size: 28px;
+      font-size: 34px;
+      line-height: 1.1;
+      margin-top: 14px;
     }
 
     .site-subtitle {
-      margin: 6px 0 16px;
+      margin: 12px 0 0;
       color: var(--muted);
+      max-width: 760px;
+      line-height: 1.7;
     }
 
-    .actions {
+    .actions,
+    .controls {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      padding-bottom: 32px;
+    }
+
+    .card {
+      padding: 24px;
+      box-shadow:
+        0 20px 48px rgba(0, 0, 0, 0.22),
+        0 0 0 1px rgba(255, 143, 61, 0.06);
     }
 
     .btn {
       appearance: none;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
+      border: 1px solid rgba(255, 143, 61, 0.45);
+      background: rgba(255, 143, 61, 0.14);
+      color: #ffd8b5;
       padding: 10px 14px;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 14px;
       cursor: pointer;
       text-decoration: none;
-      transition: transform .05s ease, box-shadow .2s ease;
+      transition: transform .12s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
     }
 
     .btn:hover {
       transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(0, 0, 0, .06);
+      border-color: rgba(255, 177, 95, 0.9);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+      background: rgba(255, 143, 61, 0.22);
     }
 
-    .btn:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    .btn.primary {
-      background: var(--primary);
-      color: var(--primary-contrast);
-      border-color: var(--primary);
-    }
-
+    .btn.primary,
     .btn.search {
-      background: var(--accent);
-      color: #ffffff;
-      border-color: var(--accent);
+      background: linear-gradient(135deg, #ff8f3d, #ffb15f);
+      color: var(--primary-contrast);
+      border-color: transparent;
+      font-weight: 700;
     }
 
     .btn.sm {
       padding: 6px 10px;
       font-size: 12px;
-      border-radius: 8px;
+      border-radius: 10px;
     }
 
-    main {
-      padding: 24px 0;
+    .muted {
+      color: var(--muted);
     }
 
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
+    .row {
+      display: grid;
+      gap: 12px;
+    }
+
+    .input,
+    .textarea,
+    .select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 143, 61, 0.2);
+      background: rgba(31, 19, 12, 0.98);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255, 194, 132, 0.08);
+      transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+    }
+
+    .input:focus,
+    .textarea:focus,
+    .select:focus {
+      border-color: rgba(255, 177, 95, 0.88);
+      box-shadow: 0 0 0 3px rgba(255, 143, 61, 0.16);
+      background: rgba(37, 22, 13, 0.98);
+    }
+
+    .input::placeholder,
+    .textarea::placeholder {
+      color: #a98b75;
+    }
+
+    .textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .search-input {
+      max-width: 420px;
+      flex: 1 1 260px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 16px;
       border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, .04);
+      border: 1px solid rgba(255, 143, 61, 0.22);
+      background: linear-gradient(180deg, #25160d, #190f09);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 194, 132, 0.08),
+        0 14px 30px rgba(0, 0, 0, 0.18);
     }
 
-    .card h2 {
-      margin-top: 0;
-      font-size: 22px;
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    .table th,
+    .table td {
+      padding: 14px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      vertical-align: top;
+      color: rgba(255, 230, 207, 0.92);
+    }
+
+    .table thead th {
+      color: #ffb15f;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+
+    .code-link {
+      color: #ffb15f;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .code-link:hover {
+      color: #ffd39b;
+      text-decoration: underline;
     }
 
     .list {
-      margin: 8px 0 0;
+      margin: 12px 0 0;
       padding-left: 18px;
+      line-height: 1.8;
     }
 
     .toast {
@@ -176,12 +325,11 @@
       left: 50%;
       bottom: 24px;
       transform: translateX(-50%);
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--border);
-      padding: 10px 14px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(30, 18, 11, 0.98);
+      border: 1px solid rgba(255, 143, 61, 0.5);
+      box-shadow: var(--shadow);
       opacity: 0;
       pointer-events: none;
       transition: opacity .2s ease, transform .2s ease;
@@ -192,89 +340,32 @@
       transform: translateX(-50%) translateY(-2px);
     }
 
-    form .row,
-    .row {
-      display: grid;
-      gap: 12px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-
-    .input,
-    .textarea,
-    .select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--card);
-      color: var(--text);
-      font-size: 14px;
-    }
-
-    .input::placeholder,
-    .textarea::placeholder {
-      color: #9ca3af;
-    }
-
-    .search-input {
-      background: #f3f4f6;
-      color: #0f1216;
-      border: 1px solid #d1d5db;
-      max-width: 420px;
-      flex: 1 1 260px;
-    }
-
-    .textarea {
-      min-height: 100px;
-      resize: vertical;
-    }
-
-    .table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 16px;
-    }
-
-    .table th,
-    .table td {
-      border-bottom: 1px solid var(--border);
-      padding: 10px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    .muted {
-      color: var(--muted);
-    }
-
-    .code-link {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    .code-link:hover {
-      text-decoration: underline;
-    }
-
     @media (max-width: 720px) {
-      .container {
-        padding: 16px;
+      body {
+        padding: 10px;
       }
 
+      main {
+        border-radius: 22px;
+      }
+
+      .header-inner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .hero {
+        padding-top: 24px;
+      }
+
+      .hero-card,
       .card {
+        border-radius: 20px;
         padding: 18px;
       }
 
-      .table {
-        display: block;
-        overflow-x: auto;
+      .site-title {
+        font-size: 28px;
       }
     }
   </style>
@@ -282,88 +373,81 @@
 
 <body>
   <header class="site-header">
-    <div class="container">
-      <h1 class="site-title module-reveal delay-1">AIRPORT CHECK</h1>
-      <p class="site-subtitle module-reveal delay-2">输入格式：代码/内容/作者</p>
+    <div class="container header-inner">
+      <div>
+        <div class="eyebrow module-reveal delay-1">Daily Contest</div>
+        <h1 class="site-title module-reveal delay-2">每日大赛</h1>
+      </div>
       <nav class="actions">
-        <button id="toggle-theme" class="btn primary module-reveal is-bounce delay-3">夜晚模式/白天模式</button>
-        <button id="say-hello" class="btn module-reveal is-bounce delay-4">功能按钮</button>
-        <a class="btn module-reveal is-bounce delay-5" href="../comic/index.html">漫画按钮</a>
-        <a class="btn module-reveal is-bounce delay-6" href="./mrds.html">每日大赛按钮</a>
+        <a class="btn module-reveal is-bounce delay-3" href="./index.html">返回航班页</a>
+        <button id="say-hello" class="btn primary module-reveal is-bounce delay-4">提示按钮</button>
       </nav>
     </div>
   </header>
 
   <main>
-    <div class="container">
-      <section class="card module-reveal delay-4">
-        <h2>开始使用</h2>
-        <p>每行输入一条数据，格式为“代码/内容/作者”，按回车或离开输入框后自动保存并显示在下面。</p>
-        <ul class="list">
-          <li>支持搜索、排序、编辑、删除</li>
-          <li>代码列会自动生成跳转链接</li>
-          <li>无法识别的文本会单独列在下方</li>
-        </ul>
-      </section>
-
-      <section class="card module-reveal delay-5" style="margin-top:16px">
-        <h2>输入文本</h2>
-        <p class="muted">每行使用“代码/内容/作者”格式，例如：CA123/上海到北京/张三</p>
-        <div class="row">
-          <textarea id="entry-input" class="textarea" placeholder="在此粘贴或输入多行：代码/内容/作者"></textarea>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-card module-reveal delay-4">
+          <h2>橙黑风格每日大赛页</h2>
+          <p class="site-subtitle">输入格式仍然是“代码/内容/作者”。保存后会显示在下方，代码列会变成超链接，点击后跳转到 `https://www.mrds66.com/archives/检测出的代码`。</p>
         </div>
-        <div class="controls">
+      </div>
+    </section>
+
+    <section class="container grid">
+      <section class="card module-reveal delay-5">
+        <h2>输入文本</h2>
+        <p class="muted">每行一条，例如：12345/作品标题/作者名</p>
+        <div class="row">
+          <textarea id="entry-input" class="textarea" placeholder="在这里输入多行：代码/内容/作者"></textarea>
+        </div>
+        <div class="controls" style="margin-top: 12px;">
           <label for="sort-by" class="muted">排序方式</label>
           <select id="sort-by" class="select" style="max-width:220px">
             <option value="actor">按作者名称</option>
             <option value="code">按代码字母</option>
           </select>
         </div>
-        <div class="controls">
+        <div class="controls" style="margin-top: 12px;">
           <label for="search-box" class="muted">搜索</label>
           <input id="search-box" class="input search-input" placeholder="输入代码/内容/作者关键字">
           <button id="search-btn" class="btn search">搜索</button>
           <button id="clear-search" class="btn">清除</button>
         </div>
-        <table class="table" aria-label="条目列表">
-          <thead>
-            <tr>
-              <th style="width:22%">代码</th>
-              <th>内容</th>
-              <th style="width:22%">作者</th>
-              <th style="width:160px">操作</th>
-            </tr>
-          </thead>
-          <tbody id="entry-tbody"></tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="table" aria-label="每日大赛条目列表">
+            <thead>
+              <tr>
+                <th style="width:22%">代码</th>
+                <th>内容</th>
+                <th style="width:22%">作者</th>
+                <th style="width:160px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="entry-tbody"></tbody>
+          </table>
+        </div>
       </section>
 
-      <section class="card module-reveal delay-6" style="margin-top:16px">
+      <section class="card module-reveal delay-6">
         <h2>无法识别的文本</h2>
         <ul id="invalid-list" class="list"></ul>
       </section>
-    </div>
+    </section>
   </main>
 
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <script>
     const storageConfig = {
-      entriesKey: "entries-v1",
-      invalidKey: "entries-invalid-v1",
-      codeLinkBase: "https://missav.ws/cn/search/"
+      entriesKey: "entries-mrds-v1",
+      invalidKey: "entries-mrds-invalid-v1",
+      codeLinkBase: "https://www.mrds66.com/archives/"
     };
 
-    const root = document.documentElement;
-    const themeKey = "site-theme";
-    const saved = localStorage.getItem(themeKey);
-    if (saved === "dark") {
-      root.classList.add("dark");
-    }
-
-    const toggleBtn = document.getElementById("toggle-theme");
-    const helloBtn = document.getElementById("say-hello");
     const toast = document.getElementById("toast");
+    const helloBtn = document.getElementById("say-hello");
     const inputBox = document.getElementById("entry-input");
     const sortSelect = document.getElementById("sort-by");
     const tbody = document.getElementById("entry-tbody");
@@ -381,15 +465,8 @@
       showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
     }
 
-    toggleBtn.addEventListener("click", () => {
-      root.classList.toggle("dark");
-      const mode = root.classList.contains("dark") ? "dark" : "light";
-      localStorage.setItem(themeKey, mode);
-      showToast(mode === "dark" ? "已切换到深色模式" : "已切换到浅色模式");
-    });
-
     helloBtn.addEventListener("click", () => {
-      showToast("欢迎使用当前页面");
+      showToast("每日大赛页面已就绪");
     });
 
     function loadEntries() {
@@ -521,7 +598,7 @@
         const td = document.createElement("td");
         td.colSpan = 4;
         td.className = "muted";
-        td.textContent = "暂无数据或无匹配结果，请在上方输入内容或调整搜索条件。";
+        td.textContent = "暂无数据或无匹配结果，请先在上方输入内容。";
         tr.appendChild(td);
         tbody.appendChild(tr);
       }
