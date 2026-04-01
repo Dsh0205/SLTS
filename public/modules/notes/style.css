@@ -676,6 +676,7 @@ body.is-desktop-shell .desktop-only {
 }
 
 .editor-launcher {
+  display: none !important;
   position: fixed;
   top: 50%;
   right: 24px;

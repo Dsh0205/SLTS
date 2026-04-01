@@ -42,19 +42,32 @@ function buildSnapshot(storageKeys) {
   return snapshot
 }
 
+let suppressTrackedStoragePersistence = 0
+
+function runWithoutTrackedStoragePersistence(task) {
+  suppressTrackedStoragePersistence += 1
+  try {
+    return task()
+  } finally {
+    suppressTrackedStoragePersistence = Math.max(0, suppressTrackedStoragePersistence - 1)
+  }
+}
+
 function hydrateLocalStorage(entry, overwrite = false) {
   const loaded = readDesktopStorage(entry.moduleId)
   const storedKeys = loaded?.state?.keys || {}
 
-  entry.keys.forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(storedKeys, key) && (overwrite || window.localStorage.getItem(key) === null)) {
-      window.localStorage.setItem(key, storedKeys[key])
-      return
-    }
+  runWithoutTrackedStoragePersistence(() => {
+    entry.keys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(storedKeys, key) && (overwrite || window.localStorage.getItem(key) === null)) {
+        window.localStorage.setItem(key, storedKeys[key])
+        return
+      }
 
-    if (overwrite && !Object.prototype.hasOwnProperty.call(storedKeys, key)) {
-      window.localStorage.removeItem(key)
-    }
+      if (overwrite && !Object.prototype.hasOwnProperty.call(storedKeys, key)) {
+        window.localStorage.removeItem(key)
+      }
+    })
   })
 
   return loaded?.filePath || null
@@ -72,14 +85,14 @@ function installStorageMirror(entry) {
 
   localStorageProto.setItem = function patchedSetItem(key, value) {
     nativeSetItem.call(this, key, value)
-    if (trackedKeys.has(String(key))) {
+    if (trackedKeys.has(String(key)) && suppressTrackedStoragePersistence === 0) {
       persistTrackedKeys()
     }
   }
 
   localStorageProto.removeItem = function patchedRemoveItem(key) {
     nativeRemoveItem.call(this, key)
-    if (trackedKeys.has(String(key))) {
+    if (trackedKeys.has(String(key)) && suppressTrackedStoragePersistence === 0) {
       persistTrackedKeys()
     }
   }
@@ -134,6 +147,9 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   },
   setAutoLaunch(enabled) {
     return ipcRenderer.invoke('desktop-settings:set-auto-launch', enabled)
+  },
+  getStorageUsage() {
+    return ipcRenderer.invoke('desktop-storage:get-usage')
   },
   getUpdateState() {
     return ipcRenderer.invoke('desktop-updater:get-state')

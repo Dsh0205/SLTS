@@ -52,6 +52,7 @@ const windows = createWindowsManager({
 })
 
 registerDesktopIpcHandlers({
+  app,
   ipcMain,
   BrowserWindow,
   dialog,

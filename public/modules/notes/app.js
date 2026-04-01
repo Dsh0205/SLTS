@@ -11,7 +11,7 @@ import {
   getSortedNotes as getSortedNotesFromStorage,
   hydrateNotes as hydrateNotesFromStorage,
   persistNotes,
-  readStoredNotes,
+  readStoredNotesState,
 } from './lib/storage.js'
 import {
   deleteNoteById as deleteNoteByIdInTree,
@@ -26,13 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const desktopBridge = resolveDesktopBridge();
   const markedInstance = window.marked;
 
-  let notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
+  const initialNotesState = readStoredNotesState(STORAGE_KEY);
+  let notes = hydrateNotesFromStorage(initialNotesState.ok ? initialNotesState.notes : []);
   let activeNoteId = null;
   let draftNoteId = null;
   let draftTitle = '';
   let draftContent = '';
   let draftLoaded = false;
   let syncingDraftInputs = false;
+  let storageProtectionActive = !initialNotesState.ok;
+  let storageProtectionMessage = buildStorageProtectionMessage(initialNotesState);
 
   const noteListEl = document.getElementById('note-list');
   const addNoteBtn = document.getElementById('add-note-btn');
@@ -120,15 +123,17 @@ document.addEventListener('DOMContentLoaded', () => {
     logoEl.src = 'logo.jpg';
   }
   syncLauncherButton();
+  applyStorageProtectionState();
 
   renderNoteList();
   showEmptyState();
+  applyStorageProtectionState({ announce: storageProtectionActive });
 
   addNoteBtn.addEventListener('click', createNote);
   searchInput.addEventListener('input', (event) => renderNoteList(event.target.value));
 
   topSideEditorBtn.addEventListener('click', toggleSideEditor);
-  editorLauncher.addEventListener('click', handleLauncherClick);
+  editorLauncher?.addEventListener('click', handleLauncherClick);
   closeEditorBtn.addEventListener('click', () => closeEditorPanel());
   panelOpenMainBtn.addEventListener('click', () => {
     switchToEditorMode();
@@ -189,6 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   importBtn.addEventListener('click', () => {
+    if (!ensureStorageWritable()) return;
+
     if (activeNoteId) {
       importInput.click();
     }
@@ -205,13 +212,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
+      if (!ensureStorageWritable()) return;
+
       const note = findNoteById(activeNoteId);
       if (!note) return;
 
+      const previousContent = note.content;
+      const previousLastModified = note.lastModified;
+      const previousUpdatedAt = note.updatedAt;
       note.content = String(loadEvent.target.result || '');
       note.lastModified = new Date().toLocaleString();
       note.updatedAt = Date.now();
-      saveNotes();
+      if (!saveNotes()) {
+        note.content = previousContent;
+        note.lastModified = previousLastModified;
+        note.updatedAt = previousUpdatedAt;
+        return;
+      }
 
       const latest = findNoteById(activeNoteId);
       renderViewer(latest);
@@ -479,7 +496,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveNotes() {
-    persistNotes(STORAGE_KEY, notes);
+    if (!ensureStorageWritable()) return false;
+    try {
+      persistNotes(STORAGE_KEY, notes);
+      return true;
+    } catch (error) {
+      activateStorageProtection('write-error', error);
+      return false;
+    }
   }
 
   function getSortedNotes(list) {
@@ -506,14 +530,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openEditorPanel() {
     editorContainer.classList.add('is-open');
-    editorLauncher.classList.add('is-active');
+    editorLauncher?.classList.add('is-active');
   }
 
   function closeEditorPanel(force = false) {
     if (!force && !confirmDiscardDraft()) return false;
 
     editorContainer.classList.remove('is-open');
-    editorLauncher.classList.remove('is-active');
+    editorLauncher?.classList.remove('is-active');
     return true;
   }
 
@@ -692,6 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function createNote() {
+    if (!ensureStorageWritable()) return;
     if (!confirmDiscardDraft()) return;
 
     activeNoteId = null;
@@ -700,17 +725,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function createSubNote(parentId) {
+    if (!ensureStorageWritable()) return;
     if (!confirmDiscardDraft()) return;
 
     const parent = findNoteById(parentId);
     if (!parent) return;
 
+    const previousNotes = cloneNotesSnapshot();
+    const previousExpandedIds = new Set(expandedNoteIds);
+    const previousActiveNoteId = activeNoteId;
     const newNote = createEmptyNote();
 
     parent.children.push(newNote);
     expandedNoteIds.add(parentId);
     activeNoteId = newNote.id;
-    saveNotes();
+    if (!saveNotes()) {
+      notes = previousNotes;
+      expandedNoteIds.clear();
+      previousExpandedIds.forEach((noteId) => expandedNoteIds.add(noteId));
+      activeNoteId = previousActiveNoteId;
+      return;
+    }
 
     renderNoteList(searchInput.value);
     showMainEditor(newNote, '新建子笔记 · 尚未保存');
@@ -852,16 +887,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function switchToEditorMode() {
+    if (!ensureStorageWritable()) return;
     const note = activeNoteId ? findNoteById(activeNoteId) : null;
     showMainEditor(note, note ? `最后修改时间：${note.lastModified}` : '新笔记 · 尚未保存');
   }
 
   function saveCurrentNote(options = {}) {
+    if (!ensureStorageWritable()) return null;
     ensureDraftReady();
 
     const title = draftTitle.trim() || '无标题笔记';
     const content = draftContent;
     const now = new Date();
+    const previousNotes = cloneNotesSnapshot();
+    const previousActiveNoteId = activeNoteId;
+    const previousDraftNoteId = draftNoteId;
     let noteIdToSelect = draftNoteId;
 
     if (draftNoteId) {
@@ -888,7 +928,15 @@ document.addEventListener('DOMContentLoaded', () => {
     draftTitle = title;
     draftContent = content;
 
-    saveNotes();
+    if (!saveNotes()) {
+      notes = previousNotes;
+      activeNoteId = previousActiveNoteId;
+      draftNoteId = previousDraftNoteId;
+      draftLoaded = true;
+      syncDraftInputs();
+      applyStorageProtectionState();
+      return null;
+    }
 
     const savedNote = findNoteById(noteIdToSelect);
     renderViewer(savedNote);
@@ -904,14 +952,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function deleteNote(id) {
+    if (!ensureStorageWritable()) return;
     const target = findNoteById(id);
     if (!target) return;
 
     if (!confirm('确定要删除这篇笔记及其子笔记吗？')) return;
 
+    const previousNotes = cloneNotesSnapshot();
+    const previousExpandedIds = new Set(expandedNoteIds);
+    const previousActiveNoteId = activeNoteId;
+    const previousDraftNoteId = draftNoteId;
+    const previousDraftTitle = draftTitle;
+    const previousDraftContent = draftContent;
+    const previousDraftLoaded = draftLoaded;
     const removedActive = noteTreeContainsId(target, activeNoteId);
     deleteNoteById(id);
-    saveNotes();
+    if (!saveNotes()) {
+      notes = previousNotes;
+      expandedNoteIds.clear();
+      previousExpandedIds.forEach((noteId) => expandedNoteIds.add(noteId));
+      activeNoteId = previousActiveNoteId;
+      draftNoteId = previousDraftNoteId;
+      draftTitle = previousDraftTitle;
+      draftContent = previousDraftContent;
+      draftLoaded = previousDraftLoaded;
+      syncDraftInputs();
+      applyStorageProtectionState();
+      renderNoteList(searchInput.value);
+      return;
+    }
     expandedNoteIds.delete(id);
 
     if (removedActive) {
@@ -984,12 +1053,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function syncNotesFromStorage() {
     desktopBridge?.reloadMirroredStorage?.();
-
-    try {
-      notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
-    } catch {
-      notes = [];
+    const nextState = readStoredNotesState(STORAGE_KEY);
+    if (!nextState.ok) {
+      storageProtectionActive = true;
+      storageProtectionMessage = buildStorageProtectionMessage(nextState);
+      applyStorageProtectionState({ announce: true });
+      return;
     }
+
+    storageProtectionActive = false;
+    storageProtectionMessage = '';
+    applyStorageProtectionState();
+    notes = hydrateNotesFromStorage(nextState.notes);
 
     if (activeNoteId) {
       const note = findNoteById(activeNoteId);
@@ -1019,10 +1094,90 @@ document.addEventListener('DOMContentLoaded', () => {
     renderNoteList(searchInput.value);
   }
 
+  function buildStorageProtectionMessage(result) {
+    if (result?.reason === 'write-error') {
+      return '检测到笔记写入失败，已进入只读保护，避免继续覆盖现有数据。';
+    }
+
+    if (result?.reason === 'parse-error') {
+      return '检测到笔记数据损坏，已进入只读保护，避免覆盖现有数据。';
+    }
+
+    if (result?.reason === 'invalid-shape') {
+      return '检测到笔记数据结构异常，已进入只读保护，避免覆盖现有数据。';
+    }
+
+    return '检测到笔记数据异常，已进入只读保护，避免覆盖现有数据。';
+  }
+
+  function applyStorageProtectionState(options = {}) {
+    const announce = Boolean(options.announce);
+    const disableEditing = storageProtectionActive;
+    const editableInputs = [mainTitleInput, mainContentInput, panelTitleInput, panelContentInput];
+    const actionButtons = [
+      addNoteBtn,
+      topSideEditorBtn,
+      editorLauncher,
+      panelOpenMainBtn,
+      editBtn,
+      importBtn,
+      panelSaveBtn,
+      saveMainBtn,
+      submitBtn,
+    ];
+
+    editableInputs.forEach((input) => {
+      input.readOnly = disableEditing;
+    });
+
+    actionButtons.forEach((button) => {
+      if (button) {
+        button.disabled = disableEditing;
+      }
+    });
+
+    if (!disableEditing) {
+      return;
+    }
+
+    updateStatus(storageProtectionMessage);
+    if (announce) {
+      showToast(storageProtectionMessage);
+      console.warn(storageProtectionMessage);
+    }
+  }
+
+  function ensureStorageWritable() {
+    if (!storageProtectionActive) {
+      return true;
+    }
+
+    updateStatus(storageProtectionMessage);
+    showToast(storageProtectionMessage);
+    console.warn(storageProtectionMessage);
+    return false;
+  }
+
+  function activateStorageProtection(reason, error) {
+    storageProtectionActive = true;
+    storageProtectionMessage = buildStorageProtectionMessage({ reason });
+    applyStorageProtectionState({ announce: true });
+    if (error) {
+      console.error(error);
+    }
+  }
+
+  function cloneNotesSnapshot(list = notes) {
+    return hydrateNotesFromStorage(list);
+  }
+
   function openDesktopFloatingEditor() {
     if (!desktopBridge?.openFloatingNotesWindow) return false;
 
     const latest = hasUnsavedChanges() ? saveCurrentNote({ announce: false }) : (activeNoteId ? findNoteById(activeNoteId) : null);
+    if (hasUnsavedChanges() && !latest) {
+      return false;
+    }
     desktopBridge.openFloatingNotesWindow(latest?.id ?? activeNoteId ?? null);
     return true;
   }

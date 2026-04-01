@@ -6,6 +6,45 @@ export function readStoredNotes(storageKey) {
   }
 }
 
+export function readStoredNotesState(storageKey) {
+  const raw = localStorage.getItem(storageKey);
+  if (raw === null) {
+    return {
+      ok: true,
+      notes: [],
+      raw: null,
+      reason: 'empty',
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return {
+        ok: false,
+        notes: [],
+        raw,
+        reason: 'invalid-shape',
+      };
+    }
+
+    return {
+      ok: true,
+      notes: parsed,
+      raw,
+      reason: 'ok',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      notes: [],
+      raw,
+      reason: 'parse-error',
+      error,
+    };
+  }
+}
+
 export function createNoteId() {
   return Date.now() + Math.floor(Math.random() * 10000);
 }
@@ -50,6 +89,7 @@ export function getSortedNotes(list) {
 }
 
 window.readStoredNotes = readStoredNotes;
+window.readStoredNotesState = readStoredNotesState;
 window.createNoteId = createNoteId;
 window.hydrateNotes = hydrateNotes;
 window.createEmptyNote = createEmptyNote;

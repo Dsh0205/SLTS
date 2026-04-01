@@ -2,6 +2,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 function registerDesktopIpcHandlers({
+  app,
   ipcMain,
   BrowserWindow,
   dialog,
@@ -12,6 +13,53 @@ function registerDesktopIpcHandlers({
   setAutoLaunchEnabled,
   updater,
 }) {
+  function calculatePathUsage(targetPath) {
+    if (!targetPath || !fs.existsSync(targetPath)) {
+      return {
+        path: targetPath || null,
+        totalBytes: 0,
+        fileCount: 0,
+      }
+    }
+
+    const stat = fs.statSync(targetPath)
+    if (stat.isFile()) {
+      return {
+        path: targetPath,
+        totalBytes: stat.size,
+        fileCount: 1,
+      }
+    }
+
+    let totalBytes = 0
+    let fileCount = 0
+    const stack = [targetPath]
+
+    while (stack.length > 0) {
+      const currentPath = stack.pop()
+      const entries = fs.readdirSync(currentPath, { withFileTypes: true })
+
+      entries.forEach((entry) => {
+        const fullPath = path.join(currentPath, entry.name)
+        if (entry.isDirectory()) {
+          stack.push(fullPath)
+          return
+        }
+
+        if (entry.isFile()) {
+          totalBytes += fs.statSync(fullPath).size
+          fileCount += 1
+        }
+      })
+    }
+
+    return {
+      path: targetPath,
+      totalBytes,
+      fileCount,
+    }
+  }
+
   ipcMain.on('desktop-storage:load-sync', (event, moduleId) => {
     event.returnValue = {
       moduleId,
@@ -194,6 +242,32 @@ function registerDesktopIpcHandlers({
   ipcMain.handle('desktop-settings:set-auto-launch', (_event, enabled) => {
     setAutoLaunchEnabled(Boolean(enabled))
     return getAutoLaunchState()
+  })
+
+  ipcMain.handle('desktop-storage:get-usage', () => {
+    const rootPath = app.getPath('userData')
+    const rootUsage = calculatePathUsage(rootPath)
+    const sections = fs.existsSync(rootPath)
+      ? fs.readdirSync(rootPath, { withFileTypes: true })
+        .map((entry) => {
+          const fullPath = path.join(rootPath, entry.name)
+          const usage = calculatePathUsage(fullPath)
+          return {
+            name: entry.name,
+            path: fullPath,
+            totalBytes: usage.totalBytes,
+            fileCount: usage.fileCount,
+          }
+        })
+        .sort((left, right) => right.totalBytes - left.totalBytes)
+      : []
+
+    return {
+      rootPath,
+      totalBytes: rootUsage.totalBytes,
+      fileCount: rootUsage.fileCount,
+      sections,
+    }
   })
 
   ipcMain.handle('desktop-updater:get-state', () => {

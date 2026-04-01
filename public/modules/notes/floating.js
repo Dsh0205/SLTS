@@ -4,7 +4,7 @@ import {
   getSortedNotes as getSortedNotesFromStorage,
   hydrateNotes as hydrateNotesFromStorage,
   persistNotes as persistNotesToStorage,
-  readStoredNotes,
+  readStoredNotesState,
 } from './lib/storage.js'
 import { findNoteById as findNoteByIdInTree } from './lib/tree.js'
 
@@ -29,13 +29,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   desktopBridge?.reloadMirroredStorage?.();
 
-  let notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
+  const initialNotesState = readStoredNotesState(STORAGE_KEY);
+  let notes = hydrateNotesFromStorage(initialNotesState.ok ? initialNotesState.notes : []);
   let activeNoteId = resolveInitialNoteId();
   let autosaveTimer = 0;
   let suppressInputSave = false;
   let isPinned = true;
+  let storageProtectionActive = !initialNotesState.ok;
+  let storageProtectionMessage = buildStorageProtectionMessage(initialNotesState);
 
   renderPicker();
+  applyStorageProtectionState({ announce: storageProtectionActive });
   ensureActiveNote();
   bindEvents();
   await hydratePinState();
@@ -185,6 +189,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function ensureActiveNote() {
+    if (storageProtectionActive) {
+      notePicker.value = '';
+      noteTitleInput.value = '';
+      noteContentInput.value = '';
+      saveStatus.textContent = storageProtectionMessage;
+      return;
+    }
+
     if (activeNoteId && findNoteById(activeNoteId)) {
       selectNote(activeNoteId, { preserveDraft: false });
       return;
@@ -265,11 +277,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function createNote() {
-    saveCurrentNote();
+    if (!ensureStorageWritable()) return;
+    const shouldSaveCurrent = Boolean(activeNoteId)
+      || noteTitleInput.value.trim() !== ''
+      || noteContentInput.value.trim() !== '';
+    if (shouldSaveCurrent && !saveCurrentNote()) {
+      return;
+    }
 
+    const previousNotes = cloneNotesSnapshot();
+    const previousActiveNoteId = activeNoteId;
+    const previousStoredActiveId = localStorage.getItem(ACTIVE_NOTE_KEY);
     const newNote = createEmptyNote();
     notes.unshift(newNote);
-    persistCurrentNotes();
+    if (!persistCurrentNotes()) {
+      notes = previousNotes;
+      activeNoteId = previousActiveNoteId;
+      restoreActiveNoteStorage(previousStoredActiveId);
+      renderPicker();
+      if (previousActiveNoteId && findNoteById(previousActiveNoteId)) {
+        notePicker.value = String(previousActiveNoteId);
+      }
+      return;
+    }
+
     activeNoteId = newNote.id;
     localStorage.setItem(ACTIVE_NOTE_KEY, String(newNote.id));
     renderPicker();
@@ -280,12 +311,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function persistCurrentNotes() {
-    persistNotesToStorage(STORAGE_KEY, notes);
+    try {
+      persistNotesToStorage(STORAGE_KEY, notes);
+      return true;
+    } catch (error) {
+      activateStorageProtection('write-error', error);
+      return false;
+    }
   }
 
   function syncFromStorage() {
     desktopBridge?.reloadMirroredStorage?.();
-    notes = hydrateNotesFromStorage(readStoredNotes(STORAGE_KEY));
+    const nextState = readStoredNotesState(STORAGE_KEY);
+    if (!nextState.ok) {
+      storageProtectionActive = true;
+      storageProtectionMessage = buildStorageProtectionMessage(nextState);
+      applyStorageProtectionState({ announce: true });
+      return;
+    }
+
+    storageProtectionActive = false;
+    storageProtectionMessage = '';
+    applyStorageProtectionState();
+    notes = hydrateNotesFromStorage(nextState.notes);
     renderPicker();
 
     if (activeNoteId && findNoteById(activeNoteId)) {
@@ -297,14 +345,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function saveCurrentNote(options = {}) {
+    if (!ensureStorageWritable()) return null;
     window.clearTimeout(autosaveTimer);
 
+    const previousNotes = cloneNotesSnapshot();
+    const previousActiveNoteId = activeNoteId;
+    const previousStoredActiveId = localStorage.getItem(ACTIVE_NOTE_KEY);
     let note = activeNoteId ? findNoteById(activeNoteId) : null;
+    const isNewNote = !note;
     if (!note) {
       note = createEmptyNote();
       notes.unshift(note);
-      activeNoteId = note.id;
-      localStorage.setItem(ACTIVE_NOTE_KEY, String(note.id));
     }
 
     note.title = noteTitleInput.value.trim() || '无标题笔记';
@@ -312,13 +363,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     note.lastModified = new Date().toLocaleString();
     note.updatedAt = Date.now();
 
-    persistCurrentNotes();
+    if (!persistCurrentNotes()) {
+      notes = previousNotes;
+      activeNoteId = previousActiveNoteId;
+      restoreActiveNoteStorage(previousStoredActiveId);
+      renderPicker();
+      if (previousActiveNoteId && findNoteById(previousActiveNoteId)) {
+        notePicker.value = String(previousActiveNoteId);
+      }
+      return null;
+    }
+
+    if (isNewNote) {
+      activeNoteId = note.id;
+      localStorage.setItem(ACTIVE_NOTE_KEY, String(note.id));
+    }
+
     renderPicker();
     notePicker.value = String(note.id);
     saveNoteBtn.classList.remove('is-primary');
     saveStatus.textContent = options.announce
       ? `已保存 ${new Date().toLocaleTimeString()}`
       : `自动保存 ${new Date().toLocaleTimeString()}`;
+    return note;
+  }
+
+  function buildStorageProtectionMessage(result) {
+    if (result?.reason === 'write-error') {
+      return '检测到笔记写入失败，已进入只读保护，避免继续覆盖现有数据。';
+    }
+
+    if (result?.reason === 'parse-error') {
+      return '检测到笔记数据损坏，已进入只读保护，避免覆盖现有数据。';
+    }
+
+    if (result?.reason === 'invalid-shape') {
+      return '检测到笔记数据结构异常，已进入只读保护，避免覆盖现有数据。';
+    }
+
+    return '检测到笔记数据异常，已进入只读保护，避免覆盖现有数据。';
+  }
+
+  function applyStorageProtectionState(options = {}) {
+    const announce = Boolean(options.announce);
+    noteTitleInput.readOnly = storageProtectionActive;
+    noteContentInput.readOnly = storageProtectionActive;
+    newNoteBtn.disabled = storageProtectionActive;
+    saveNoteBtn.disabled = storageProtectionActive;
+
+    if (!storageProtectionActive) {
+      return;
+    }
+
+    saveNoteBtn.classList.remove('is-primary');
+    saveStatus.textContent = storageProtectionMessage;
+    if (announce) {
+      console.warn(storageProtectionMessage);
+    }
+  }
+
+  function ensureStorageWritable() {
+    if (!storageProtectionActive) {
+      return true;
+    }
+
+    saveStatus.textContent = storageProtectionMessage;
+    console.warn(storageProtectionMessage);
+    return false;
+  }
+
+  function activateStorageProtection(reason, error) {
+    storageProtectionActive = true;
+    storageProtectionMessage = buildStorageProtectionMessage({ reason });
+    applyStorageProtectionState({ announce: true });
+    if (error) {
+      console.error(error);
+    }
+  }
+
+  function cloneNotesSnapshot(list = notes) {
+    return hydrateNotesFromStorage(list);
+  }
+
+  function restoreActiveNoteStorage(storedValue) {
+    if (storedValue === null) {
+      localStorage.removeItem(ACTIVE_NOTE_KEY);
+      return;
+    }
+
+    localStorage.setItem(ACTIVE_NOTE_KEY, storedValue);
   }
 
   function applyHeadingLevel(level) {

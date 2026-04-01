@@ -7,6 +7,7 @@ const props = defineProps<{
   isDesktop: boolean
   startupBusy: boolean
   backupBusy: boolean
+  storageBusy: boolean
   launchAtStartupEnabled: boolean
   updateSupported: boolean
   updateBusy: boolean
@@ -21,6 +22,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggle: []
   toggleAutoLaunch: []
+  inspectStorage: []
   triggerUpdateAction: []
   exportBackup: []
   importBackup: []
@@ -186,6 +188,14 @@ defineExpose({
           @click="emit('toggleAutoLaunch')"
         >
           {{ props.launchAtStartupEnabled ? '关闭开机自启动' : '开启开机自启动' }}
+        </button>
+        <button
+          class="settings-action"
+          type="button"
+          :disabled="props.storageBusy"
+          @click="emit('inspectStorage')"
+        >
+          {{ props.storageBusy ? '正在统计占用...' : '查看本地存储占用' }}
         </button>
         <button
           class="settings-action"

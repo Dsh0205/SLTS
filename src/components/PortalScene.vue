@@ -20,6 +20,7 @@ type DesktopBridge = {
   importBackup?: () => Promise<{ canceled?: boolean, moduleCount?: number } | null>
   getAutoLaunch?: () => Promise<{ supported?: boolean, enabled?: boolean } | null>
   setAutoLaunch?: (enabled: boolean) => Promise<{ supported?: boolean, enabled?: boolean } | null>
+  getStorageUsage?: () => Promise<DesktopStorageUsage | null>
   getUpdateState?: () => Promise<DesktopUpdateState | null>
   checkForUpdates?: () => Promise<DesktopUpdateState | null>
   installUpdate?: () => Promise<{ started?: boolean, state?: DesktopUpdateState | null } | null>
@@ -37,6 +38,17 @@ type DesktopUpdateState = {
   progressPercent?: number
   message?: string
 }
+type DesktopStorageUsage = {
+  rootPath?: string | null
+  totalBytes?: number
+  fileCount?: number
+  sections?: Array<{
+    name: string
+    path?: string | null
+    totalBytes?: number
+    fileCount?: number
+  }>
+}
 
 const desktopBridge = ref<DesktopBridge | null>(null)
 const settingsPanelRef = ref<SettingsPanelExpose | null>(null)
@@ -48,6 +60,7 @@ const pointerInside = ref(false)
 const settingsOpen = ref(false)
 const backupBusy = ref(false)
 const startupBusy = ref(false)
+const storageBusy = ref(false)
 const launchAtStartupEnabled = ref(false)
 const desktopUpdateState = ref<DesktopUpdateState>({
   supported: false,
@@ -397,6 +410,39 @@ function setDesktopMessage(message: string, tone: 'info' | 'success' | 'error') 
   desktopActionTone.value = tone
 }
 
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B'
+  }
+
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
+
+  if (bytes >= 1024) {
+    return `${Math.round(bytes / 1024)} KB`
+  }
+
+  return `${Math.round(bytes)} B`
+}
+
+function estimateLocalStorageBytes() {
+  let total = 0
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (!key) continue
+    const value = window.localStorage.getItem(key) ?? ''
+    total += (key.length + value.length) * 2
+  }
+
+  return total
+}
+
 function applyDesktopUpdateState(state: DesktopUpdateState | null | undefined) {
   if (!state) {
     return
@@ -464,6 +510,39 @@ async function toggleAutoLaunch() {
     setDesktopMessage('开机自启动设置失败，请稍后再试。', 'error')
   } finally {
     startupBusy.value = false
+  }
+}
+
+async function inspectStorageUsage() {
+  if (storageBusy.value) return
+
+  storageBusy.value = true
+
+  try {
+    if (desktopBridge.value?.getStorageUsage) {
+      const usage = await desktopBridge.value.getStorageUsage()
+      const totalBytes = usage?.totalBytes ?? 0
+      const topSections = (usage?.sections ?? [])
+        .filter((section) => (section.totalBytes ?? 0) > 0)
+        .slice(0, 3)
+        .map((section) => `${section.name} ${formatBytes(section.totalBytes ?? 0)}`)
+
+      const details = topSections.length > 0 ? ` 主要占用：${topSections.join('，')}。` : ''
+      const location = usage?.rootPath ? ` 存储位置：${usage.rootPath}` : ''
+      setDesktopMessage(`本地已占用 ${formatBytes(totalBytes)}。${details}${location}`, 'info')
+      return
+    }
+
+    const estimatedBytes = estimateLocalStorageBytes()
+    const storageEstimate = await navigator.storage?.estimate?.()
+    const usageText = storageEstimate?.usage ? formatBytes(storageEstimate.usage) : '未知'
+    const quotaText = storageEstimate?.quota ? formatBytes(storageEstimate.quota) : '未知'
+    setDesktopMessage(`当前浏览器站点已使用约 ${usageText} / ${quotaText}，其中 localStorage 约 ${formatBytes(estimatedBytes)}。`, 'info')
+  } catch (error) {
+    console.error(error)
+    setDesktopMessage('统计本地存储占用失败，请稍后再试。', 'error')
+  } finally {
+    storageBusy.value = false
   }
 }
 
@@ -625,6 +704,7 @@ onBeforeUnmount(() => {
       :is-desktop="isDesktop"
       :startup-busy="startupBusy"
       :backup-busy="backupBusy"
+      :storage-busy="storageBusy"
       :launch-at-startup-enabled="launchAtStartupEnabled"
       :update-supported="updateSupported"
       :update-busy="updateActionBusy"
@@ -635,6 +715,7 @@ onBeforeUnmount(() => {
       :music-tracks="musicTracks"
       :selected-music-id="selectedTrackId"
       @toggle="toggleSettings"
+      @inspect-storage="inspectStorageUsage"
       @trigger-update-action="triggerUpdateAction"
       @toggle-auto-launch="toggleAutoLaunch"
       @export-backup="exportDesktopBackup"
