@@ -1,6 +1,6 @@
 {
   "name": "shanlic-life-tracker-system",
-  "version": "1.5.1",
+  "version": "1.5.5",
   "private": true,
   "main": "electron/main.cjs",
   "type": "module",
