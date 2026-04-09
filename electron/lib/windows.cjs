@@ -41,11 +41,26 @@ function createWindowsManager({
       relativePath: 'index.html',
     })
 
+    mainWindow.on('page-title-updated', (event) => {
+      event.preventDefault()
+      if (!mainWindow?.isDestroyed()) {
+        mainWindow.setTitle('SHANLIC LIFE TRACKER SYSTEM')
+      }
+    })
+
     if (!app.isPackaged) {
       mainWindow.webContents.openDevTools({ mode: 'detach' })
     }
 
     return mainWindow
+  }
+
+  function applyFloatingNotesAlwaysOnTop(enabled) {
+    if (!floatingNotesWindow || floatingNotesWindow.isDestroyed()) {
+      return
+    }
+
+    floatingNotesWindow.setAlwaysOnTop(Boolean(enabled), enabled ? 'floating' : 'normal')
   }
 
   function focusFloatingNotesWindow(noteId) {
@@ -95,7 +110,7 @@ function createWindowsManager({
       },
     })
 
-    floatingNotesWindow.setAlwaysOnTop(floatingNotesPinned, floatingNotesPinned ? 'screen-saver' : 'normal')
+    applyFloatingNotesAlwaysOnTop(floatingNotesPinned)
     registerExternalLinkPolicy(floatingNotesWindow, shell)
     loadRendererPage({
       browserWindow: floatingNotesWindow,
@@ -121,7 +136,7 @@ function createWindowsManager({
     floatingNotesPinned = Boolean(enabled)
 
     if (floatingNotesWindow && !floatingNotesWindow.isDestroyed()) {
-      floatingNotesWindow.setAlwaysOnTop(floatingNotesPinned, floatingNotesPinned ? 'screen-saver' : 'normal')
+      applyFloatingNotesAlwaysOnTop(floatingNotesPinned)
     }
 
     return floatingNotesPinned

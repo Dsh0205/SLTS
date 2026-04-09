@@ -1,4 +1,4 @@
-export type ModuleKey = 'notes' | 'lottery' | 'flight' | 'words' | 'quadrant' | 'hobby'
+export type ModuleKey = 'notes' | 'lottery' | 'flight' | 'photography' | 'words' | 'quadrant' | 'hobby'
 
 export interface ModuleDefinition {
   key: ModuleKey
@@ -48,6 +48,12 @@ export const orbitModules: ModuleDefinition[] = [
     delay: '-12s',
     rotation: '48deg',
   }),
+  createModule('photography', '\u6444\u5f71\u4f5c\u54c1\u5730\u56fe', '\u5730\u56fe\u4e0e\u4f5c\u54c1\u5c55\u793a', '#27b06e', '#9af3c1', 'modules/photography/index.html', {
+    size: '520px',
+    duration: '35s',
+    delay: '-16s',
+    rotation: '-38deg',
+  }),
   createModule('words', '\u5355\u8bcd\u7cfb\u7edf', '\u5b66\u4e60\u4e0e\u8bad\u7ec3', '#efd8aa', '#fff1ce', 'modules/words/index.html', {
     size: '580px',
     duration: '37s',
@@ -61,6 +67,13 @@ export const orbitModules: ModuleDefinition[] = [
     rotation: '12deg',
   }),
 ]
+
+for (const module of orbitModules) {
+  if (module.key === 'quadrant') {
+    module.title = '\u5feb\u6377\u7ed8\u56fe\u677f'
+    module.subtitle = '\u65f6\u95f4\u8f74\u4e0e\u5173\u7cfb\u7bad\u5934'
+  }
+}
 
 export const centerModule: ModuleDefinition = createModule(
   'hobby',

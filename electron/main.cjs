@@ -3,6 +3,7 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 
 const { createStorageManager } = require('./lib/storage.cjs')
 const { createNotesAssetsManager } = require('./lib/notes-assets.cjs')
+const { createPhotographyAssetsManager } = require('./lib/photography-assets.cjs')
 const { createUpdaterManager } = require('./lib/updater.cjs')
 const { createWindowsManager } = require('./lib/windows.cjs')
 const { registerDesktopIpcHandlers } = require('./lib/ipc-handlers.cjs')
@@ -40,6 +41,7 @@ function setAutoLaunchEnabled(enabled) {
 
 const storage = createStorageManager({ app })
 const notesAssets = createNotesAssetsManager({ app })
+const photographyAssets = createPhotographyAssetsManager({ storage })
 const updater = createUpdaterManager({ app, BrowserWindow })
 const windows = createWindowsManager({
   app,
@@ -58,6 +60,7 @@ registerDesktopIpcHandlers({
   dialog,
   storage,
   notesAssets,
+  photographyAssets,
   windows,
   getAutoLaunchState,
   setAutoLaunchEnabled,

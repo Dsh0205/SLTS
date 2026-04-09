@@ -40,12 +40,7 @@
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, Arial, sans-serif;
-      background:
-        radial-gradient(circle at 12% 18%, rgba(255, 106, 120, 0.34), transparent 24%),
-        radial-gradient(circle at 86% 14%, rgba(255, 193, 201, 0.78), transparent 28%),
-        radial-gradient(circle at 14% 82%, rgba(255, 106, 120, 0.2), transparent 22%),
-        radial-gradient(circle at 88% 84%, rgba(255, 106, 120, 0.18), transparent 24%),
-        linear-gradient(180deg, #ffe4e9, var(--bg));
+      background: var(--bg);
       color: var(--text);
     }
 
@@ -64,7 +59,7 @@
       height: 220px;
       top: -70px;
       right: -50px;
-      background: rgba(255, 106, 120, 0.24);
+      display: none;
     }
 
     body::after {
@@ -72,7 +67,7 @@
       height: 180px;
       left: -44px;
       bottom: -48px;
-      background: rgba(255, 193, 201, 0.72);
+      display: none;
     }
 
     .container {
@@ -294,7 +289,7 @@
     </div>
   </header>
 
-  <main>
+  <main class="module-pop-surface delay-1">
     <div class="container">
       <section class="card module-reveal delay-4">
         <h2>开始使用</h2>

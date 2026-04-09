@@ -4,6 +4,7 @@ import { parseManualEntries as parseManualEntriesFromManual } from "./manual.js"
 import { buildOptionItems as buildOptionItemsFromQuiz, buildRoundEntries as buildRoundEntriesForRound, getEntryKey as getEntryKeyFromQuiz, getRemainingPracticeEntries as getRemainingPracticeEntriesForPractice, getWrongRecordKey as getWrongRecordKeyFromQuiz, hasNextRoundAvailable as hasNextRoundAvailableForPractice, hasSufficientQuizEntries as hasSufficientQuizEntriesFromQuiz, pickQuestionEntry as pickQuestionEntryForQuiz, shuffleArray as shuffleArrayFromQuiz } from "./quiz.js";
 import { hideRoundCelebrationUI, playRoundCompletionRevealUI, renderCelebrationEffectUI, renderGroupSelectorUI, renderQuizOptionsUI, renderResultStatsUI, renderRoundProgressUI, renderWordColumnUI, renderWrongRecordsUI, syncGroupSelectOptions } from "./render.js";
 import { applyAnswerState, createClearedPracticeState, createExitedSessionState, createPreparedRoundState, createRoundMetricsResetState, createStartedSessionState } from "./session.js";
+import { playFinishPracticeSound, playRoundCompleteSound, playWrongAnswerSound } from "./sound.js";
 import { buildWordLibraryPayload as buildWordLibraryPayloadFromStorage, loadWordBanksFromStorage, saveWordBanksToStorage } from "./storage.js";
 import { exportWordsPayload, importWordsFromText as importWordsFromTransfer, openWordImportPicker } from "./transfer.js";
 
@@ -200,7 +201,7 @@ russianCreateGroupBtn.addEventListener("click", () => createGroupFromInput("russ
 englishGroupSelect.addEventListener("change", () => setActiveLibraryGroup("english", englishGroupSelect.value));
 russianGroupSelect.addEventListener("change", () => setActiveLibraryGroup("russian", russianGroupSelect.value));
 
-exitBtn.addEventListener("click", exitQuiz);
+exitBtn.addEventListener("click", finishPracticeLoop);
 roundContinueBtn.addEventListener("click", continueNextRound);
 roundStopBtn.addEventListener("click", finishPracticeLoop);
 
@@ -519,6 +520,7 @@ function handleOptionClick(button, isCorrect) {
     recordWrongWord(entry);
     renderWrongRecords();
     triggerFlash("flash-error");
+    playWrongAnswerSound();
   }
 
   applySessionState(answerState);
@@ -614,6 +616,7 @@ function showRoundCompletion() {
     effects: CELEBRATION_EFFECTS,
   });
   roundCompleteOverlay.hidden = false;
+  playRoundCompleteSound();
   playRoundCompletionRevealUI({
     overlayElement: roundCompleteOverlay,
     revealItems: [
@@ -648,6 +651,7 @@ function continueNextRound() {
 
 function finishPracticeLoop() {
   roundCelebrationVisible = false;
+  playFinishPracticeSound();
   exitQuiz();
 }
 

@@ -8,6 +8,7 @@ function registerDesktopIpcHandlers({
   dialog,
   storage,
   notesAssets,
+  photographyAssets,
   windows,
   getAutoLaunchState,
   setAutoLaunchEnabled,
@@ -60,6 +61,22 @@ function registerDesktopIpcHandlers({
     }
   }
 
+  function notifyStorageChanged(moduleId) {
+    BrowserWindow.getAllWindows().forEach((browserWindow) => {
+      if (!browserWindow.isDestroyed()) {
+        browserWindow.webContents.send('desktop-storage:changed', moduleId)
+      }
+    })
+  }
+
+  function decorateModuleStorageInfo(moduleId, info) {
+    if (moduleId === 'photography' && photographyAssets) {
+      return photographyAssets.getStorageInfoWithAssets(info)
+    }
+
+    return info
+  }
+
   ipcMain.on('desktop-storage:load-sync', (event, moduleId) => {
     event.returnValue = {
       moduleId,
@@ -70,15 +87,65 @@ function registerDesktopIpcHandlers({
 
   ipcMain.on('desktop-storage:save-sync', (event, moduleId, payload) => {
     const filePath = storage.writeModuleStorage(moduleId, payload)
-    BrowserWindow.getAllWindows().forEach((browserWindow) => {
-      if (!browserWindow.isDestroyed()) {
-        browserWindow.webContents.send('desktop-storage:changed', moduleId)
-      }
-    })
+    notifyStorageChanged(moduleId)
     event.returnValue = {
       ok: true,
       moduleId,
       filePath,
+    }
+  })
+
+  ipcMain.handle('desktop-storage:get-module-info', (_event, moduleId) => {
+    return decorateModuleStorageInfo(moduleId, storage.getModuleStorageInfo(moduleId))
+  })
+
+  ipcMain.handle('desktop-storage:choose-module-directory', async (event, moduleId) => {
+    const browserWindow = BrowserWindow.fromWebContents(event.sender)
+    const currentInfo = storage.getModuleStorageInfo(moduleId)
+    const result = await dialog.showOpenDialog(browserWindow, {
+      title: `选择 ${moduleId} 模块的保存目录`,
+      defaultPath: currentInfo.directoryPath,
+      properties: ['openDirectory', 'createDirectory'],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return {
+        canceled: true,
+        ...currentInfo,
+      }
+    }
+
+    const nextInfo = storage.moveModuleStorage(moduleId, result.filePaths[0])
+    if (moduleId === 'photography' && photographyAssets) {
+      const { assetsRoot } = photographyAssets.moveAssetsForStorageChange(currentInfo, nextInfo)
+      const rewrittenPayload = photographyAssets.rewritePhotographyModulePayload(
+        storage.readModuleStorage(moduleId),
+        assetsRoot,
+      )
+      storage.writeModuleStorage(moduleId, rewrittenPayload)
+    }
+    notifyStorageChanged(moduleId)
+    return {
+      canceled: false,
+      ...decorateModuleStorageInfo(moduleId, storage.getModuleStorageInfo(moduleId)),
+    }
+  })
+
+  ipcMain.handle('desktop-storage:reset-module-directory', (_event, moduleId) => {
+    const currentInfo = storage.getModuleStorageInfo(moduleId)
+    const nextInfo = storage.moveModuleStorage(moduleId, null)
+    if (moduleId === 'photography' && photographyAssets) {
+      const { assetsRoot } = photographyAssets.moveAssetsForStorageChange(currentInfo, nextInfo)
+      const rewrittenPayload = photographyAssets.rewritePhotographyModulePayload(
+        storage.readModuleStorage(moduleId),
+        assetsRoot,
+      )
+      storage.writeModuleStorage(moduleId, rewrittenPayload)
+    }
+    notifyStorageChanged(moduleId)
+    return {
+      canceled: false,
+      ...decorateModuleStorageInfo(moduleId, storage.getModuleStorageInfo(moduleId)),
     }
   })
 
@@ -163,6 +230,35 @@ function registerDesktopIpcHandlers({
     }
   })
 
+  ipcMain.handle('desktop-photography:save-photo', async (_event, payload = {}) => {
+    if (!photographyAssets) {
+      return { canceled: true }
+    }
+
+    return {
+      canceled: false,
+      ...photographyAssets.savePhotoFromDataUrl(payload.dataUrl, payload),
+    }
+  })
+
+  ipcMain.handle('desktop-photography:delete-photo', async (_event, filePath) => {
+    if (!photographyAssets) {
+      return { deleted: false }
+    }
+
+    return {
+      deleted: photographyAssets.deletePhotoAsset(filePath),
+    }
+  })
+
+  ipcMain.handle('desktop-photography:delete-photos', async (_event, filePaths) => {
+    if (!photographyAssets) {
+      return { deletedCount: 0 }
+    }
+
+    return photographyAssets.deletePhotoAssets(filePaths)
+  })
+
   ipcMain.handle('desktop-backup:export', async (event) => {
     const browserWindow = BrowserWindow.fromWebContents(event.sender)
     const now = new Date()
@@ -191,6 +287,7 @@ function registerDesktopIpcHandlers({
       modules: storage.readAllModuleStorage(),
       assets: {
         notes: notesAssets.readNotesAssetsBackup(),
+        photography: photographyAssets?.readPhotographyAssetsBackup?.() || [],
       },
     }
 
@@ -225,8 +322,21 @@ function registerDesktopIpcHandlers({
       throw new Error('备份文件格式无效。')
     }
 
-    storage.replaceAllModuleStorage(parsed.modules)
+    const nextModules = parsed.modules && typeof parsed.modules === 'object'
+      ? { ...parsed.modules }
+      : {}
+
+    if (nextModules.photography && photographyAssets) {
+      const assetsRoot = photographyAssets.getPhotographyAssetsRoot()
+      nextModules.photography = photographyAssets.rewritePhotographyModulePayload(
+        nextModules.photography,
+        assetsRoot,
+      )
+    }
+
+    storage.replaceAllModuleStorage(nextModules)
     notesAssets.replaceNotesAssets(parsed.assets?.notes || [])
+    photographyAssets?.replacePhotographyAssets?.(parsed.assets?.photography || [])
 
     return {
       canceled: false,

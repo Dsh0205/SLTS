@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>摄影作品展示</title>
+  <link rel="stylesheet" href="../shared/reveal.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body data-page="gallery">
+  <main class="atlas-shell atlas-shell--gallery">
+    <section class="gallery-view module-pop-surface delay-1">
+      <div class="gallery-corner-tools module-pop-surface delay-2">
+        <button id="panelToggleBtn" class="gallery-plus-btn" type="button" aria-label="打开操作菜单" aria-expanded="false">+</button>
+        <div id="panelMenu" class="gallery-plus-menu" hidden>
+          <div class="sidebar-actions sidebar-actions--menu">
+            <button id="backToMapBtn" class="ghost-btn" type="button">返回地图</button>
+          </div>
+
+          <label class="field-label">
+            <span>地点名称</span>
+            <input id="anchorNameInput" type="text" maxlength="32" placeholder="输入地点名称">
+          </label>
+
+          <div class="meta-stack">
+            <span id="anchorProvinceValue">所在省份</span>
+            <span id="anchorPositionValue">地图坐标</span>
+            <span id="anchorAlbumCountValue">0 个相册</span>
+            <span id="anchorPhotoCountValue">0 张照片</span>
+          </div>
+
+          <div id="storagePanel" class="storage-panel" hidden>
+            <span class="storage-panel-title">桌面保存位置</span>
+            <div id="storagePathValue" class="storage-path-value">桌面版可在这里查看和修改保存目录</div>
+            <div class="sidebar-actions sidebar-actions--menu storage-actions">
+              <button id="changeStorageDirBtn" type="button">修改保存目录</button>
+              <button id="resetStorageDirBtn" class="ghost-btn" type="button">恢复默认目录</button>
+            </div>
+          </div>
+
+          <div class="sidebar-actions sidebar-actions--menu">
+            <button id="createAlbumBtn" type="button">新建相册</button>
+            <button id="addPhotosBtn" type="button">导入照片</button>
+            <button id="deleteAlbumBtn" class="ghost-btn" type="button">删除相册</button>
+            <button id="deleteAnchorBtn" class="ghost-btn" type="button">删除地点</button>
+            <input id="photoInput" type="file" accept="image/*" multiple hidden>
+          </div>
+        </div>
+      </div>
+
+      <header class="gallery-topbar module-pop-surface delay-2">
+        <div class="gallery-title-block">
+          <p class="eyebrow">PHOTO ALBUMS</p>
+          <h2 id="galleryTitle">摄影作品</h2>
+          <p id="galleryStatus" class="gallery-status">正在整理这个地点的摄影相册。</p>
+        </div>
+      </header>
+
+      <section class="gallery-panel">
+        <div class="gallery-content module-pop-surface delay-3">
+          <div class="gallery-toolbar">
+            <button id="albumBackBtn" class="ghost-btn gallery-back-btn" type="button" hidden>返回相册列表</button>
+            <div class="gallery-toolbar-copy">
+              <strong id="contentTitle">相册书架</strong>
+              <span id="contentSubtitle">点击封面进入相册，选中照片后按 F2 可以重命名。</span>
+            </div>
+          </div>
+
+          <div id="galleryEmpty" class="gallery-empty">
+            <strong>这里还没有任何内容</strong>
+            <p>先新建一个相册，再把你的摄影作品放进来。</p>
+          </div>
+
+          <div id="albumShelf" class="album-shelf"></div>
+          <div id="photoGrid" class="photo-grid" hidden></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <button id="lightboxCloseBtn" class="lightbox-close" type="button" aria-label="关闭预览">×</button>
+    <figure class="lightbox-figure">
+      <img id="lightboxImage" alt="摄影作品预览">
+      <figcaption id="lightboxCaption"></figcaption>
+    </figure>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script type="module" src="./gallery.js"></script>
+</body>
+</html>

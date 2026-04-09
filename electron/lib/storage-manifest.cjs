@@ -15,9 +15,24 @@ const STORAGE_MANIFEST = Object.freeze([
     keys: ['entries-v1', 'entries-invalid-v1', 'site-theme'],
   },
   {
+    moduleId: 'photography',
+    pathSuffix: '/modules/photography/index.html',
+    keys: ['shanlic-photography-map-v1'],
+  },
+  {
+    moduleId: 'photography',
+    pathSuffix: '/modules/photography/gallery.html',
+    keys: ['shanlic-photography-map-v1'],
+  },
+  {
     moduleId: 'words',
     pathSuffix: '/modules/words/index.html',
     keys: ['word-practice-data-v2'],
+  },
+  {
+    moduleId: 'quadrant',
+    pathSuffix: '/modules/quadrant/index.html',
+    keys: ['shanlic-time-planner-v1'],
   },
   {
     moduleId: 'hobby',

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中国摄影地图</title>
+  <link rel="stylesheet" href="../shared/reveal.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body data-page="map">
+  <main class="atlas-shell atlas-shell--map">
+    <section id="mapView" class="map-view module-pop-surface delay-1">
+      <div class="map-stage map-stage--large module-pop-surface delay-2">
+        <div class="map-stage-glow" aria-hidden="true"></div>
+        <svg
+          id="chinaMap"
+          class="china-map china-map--large module-pop-surface module-pop-svg delay-3"
+          viewBox="0 0 1000 700"
+          role="img"
+          aria-label="中国省份摄影地图"
+        >
+          <defs>
+            <filter id="provinceShadowFilter" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#031008" flood-opacity="0.34"></feDropShadow>
+            </filter>
+          </defs>
+
+          <g class="map-grid" aria-hidden="true">
+            <path d="M80 110 L920 110"></path>
+            <path d="M70 220 L930 220"></path>
+            <path d="M60 340 L940 340"></path>
+            <path d="M70 470 L930 470"></path>
+            <path d="M90 600 L910 600"></path>
+            <path d="M130 60 L92 640"></path>
+            <path d="M300 58 L258 642"></path>
+            <path d="M500 52 L492 648"></path>
+            <path d="M700 58 L742 640"></path>
+            <path d="M870 70 L910 632"></path>
+          </g>
+
+          <g id="provinceShapeLayer"></g>
+          <g id="provinceSelectionLayer"></g>
+          <g id="provinceLabelLayer"></g>
+          <g id="anchorLayer"></g>
+        </svg>
+      </div>
+
+      <div id="provinceFocusBackdrop" class="province-focus-backdrop" hidden>
+        <section class="province-focus-card" aria-label="省份摄影浮层">
+          <button id="closeProvinceFocusBtn" class="province-focus-close" type="button" aria-label="关闭省份浮层">×</button>
+          <div class="province-focus-meta">
+            <strong id="focusProvinceName">省份</strong>
+            <span id="focusProvinceHint">在放大的省份模块里右键，可以给摄影展示页添加锚点。</span>
+          </div>
+          <div class="province-focus-stage">
+            <svg
+              id="provinceFocusMap"
+              class="province-focus-map"
+              viewBox="0 0 1000 700"
+              role="img"
+              aria-label="放大的省份摄影模块"
+            >
+              <g id="focusProvinceLayer"></g>
+              <g id="focusAnchorLayer"></g>
+              <g id="focusLabelLayer"></g>
+            </svg>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -39,22 +39,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const noteListEl = document.getElementById('note-list');
   const addNoteBtn = document.getElementById('add-note-btn');
-  const searchInput = document.getElementById('search-input');
+  const sidebarSearchInput = document.getElementById('sidebar-search-input');
+  const topSearchInput = document.getElementById('search-input');
+  const searchInputs = [sidebarSearchInput, topSearchInput].filter((input) => input instanceof HTMLInputElement);
   const lastModifiedEl = document.getElementById('last-modified');
   const logoEl = document.querySelector('.logo');
 
-  const topSideEditorBtn = document.getElementById('side-editor-toggle-btn');
-  const topDesktopBtn = document.getElementById('desktop-floating-btn');
+  const noteMenu = document.getElementById('note-menu');
+  const noteMenuBtn = document.getElementById('note-menu-btn');
+  const noteMenuPanel = document.getElementById('note-menu-panel');
+  const topSideEditorBtn = document.getElementById('note-menu-side-panel-btn');
+  const topDesktopBtn = document.getElementById('note-menu-desktop-btn');
+  const inlineDesktopBtn = null;
 
   const viewContainer = document.getElementById('view-container');
   const viewTitle = document.getElementById('view-title');
   const viewDate = document.getElementById('view-date');
   const viewContent = document.getElementById('view-content');
+  const viewBody = viewContainer?.querySelector('.view-body') ?? null;
   const viewToc = document.querySelector('.view-toc');
   const viewTocList = document.getElementById('view-toc-list');
-  const editBtn = document.getElementById('edit-note-btn');
-  const importBtn = document.getElementById('import-note-btn');
-  const exportBtn = document.getElementById('export-note-btn');
+  const saveMenuBtn = document.getElementById('note-menu-save-btn');
+  const editBtn = document.getElementById('note-menu-edit-btn');
+  const importBtn = document.getElementById('note-menu-import-btn');
+  const exportBtn = document.getElementById('note-menu-export-btn');
   const importInput = document.getElementById('import-file-input');
 
   const editorView = document.getElementById('editor-view');
@@ -111,12 +119,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const expandedNoteIds = new Set();
   const handleMainEditorChange = () => handleDraftInput('main');
   let toastTimer = 0;
+  let activeTocHeadingId = '';
 
   marked.setOptions({
     headerIds: true,
     gfm: true,
     breaks: true,
   });
+
+  function getVisibleSearchInput() {
+    return searchInputs.find((input) => input.offsetParent !== null) ?? searchInputs[0] ?? null;
+  }
+
+  function getSearchQuery() {
+    return getVisibleSearchInput()?.value ?? searchInputs[0]?.value ?? '';
+  }
+
+  function syncSearchInputs(value, source = null) {
+    searchInputs.forEach((input) => {
+      if (input !== source) {
+        input.value = value;
+      }
+    });
+  }
 
   document.body.classList.toggle('is-desktop-shell', Boolean(desktopBridge?.isElectron));
   if (logoEl instanceof HTMLImageElement) {
@@ -130,29 +155,64 @@ document.addEventListener('DOMContentLoaded', () => {
   applyStorageProtectionState({ announce: storageProtectionActive });
 
   addNoteBtn.addEventListener('click', createNote);
-  searchInput.addEventListener('input', (event) => renderNoteList(event.target.value));
+  searchInputs.forEach((input) => {
+    input.addEventListener('input', (event) => {
+      const nextValue = event.target.value;
+      syncSearchInputs(nextValue, event.target);
+      renderNoteList(nextValue);
+    });
+  });
+  viewBody?.addEventListener('scroll', syncActiveTocHeading, { passive: true });
+  window.addEventListener('resize', syncActiveTocHeading);
 
-  topSideEditorBtn.addEventListener('click', toggleSideEditor);
+  noteMenuBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleNoteMenu();
+  });
+  noteMenuPanel?.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+
+  topSideEditorBtn?.addEventListener('click', () => {
+    closeNoteMenu();
+    toggleSideEditor();
+  });
   editorLauncher?.addEventListener('click', handleLauncherClick);
   closeEditorBtn.addEventListener('click', () => closeEditorPanel());
   panelOpenMainBtn.addEventListener('click', () => {
+    closeNoteMenu();
     switchToEditorMode();
   });
 
   topDesktopBtn?.addEventListener('click', () => {
+    closeNoteMenu();
     openDesktopFloatingEditor();
+  });
+  inlineDesktopBtn?.addEventListener('click', () => {
+    closeNoteMenu();
+    openDesktopFloatingEditor();
+  });
+  saveMenuBtn?.addEventListener('click', () => {
+    closeNoteMenu();
+    if (isMainEditorVisible()) {
+      saveAndShowViewer('main');
+      return;
+    }
+    if (isEditorVisible()) {
+      saveAndShowViewer('panel');
+    }
   });
 
   panelSaveBtn.addEventListener('click', () => {
-    saveAndKeepEditing('panel');
+    saveAndShowViewer('panel');
   });
 
   saveMainBtn.addEventListener('click', () => {
-    saveAndKeepEditing('main');
+    saveAndShowViewer('main');
   });
 
   submitBtn.addEventListener('click', () => {
-    saveAndKeepEditing('main');
+    saveAndShowViewer('main');
   });
 
   backToViewBtn.addEventListener('click', () => {
@@ -169,10 +229,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   editBtn.addEventListener('click', () => {
+    closeNoteMenu();
     switchToEditorMode();
   });
 
   exportBtn.addEventListener('click', () => {
+    closeNoteMenu();
     if (!activeNoteId) return;
 
     if (draftNoteId === activeNoteId && hasUnsavedChanges()) {
@@ -194,6 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   importBtn.addEventListener('click', () => {
+    closeNoteMenu();
     if (!ensureStorageWritable()) return;
 
     if (activeNoteId) {
@@ -239,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStatus(`最后修改时间：${latest.lastModified}`);
       }
 
-      renderNoteList(searchInput.value);
+      renderNoteList(getSearchQuery());
       showToast('导入成功。');
     };
     reader.readAsText(file);
@@ -389,6 +452,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
+      if (isNoteMenuOpen()) {
+        event.preventDefault();
+        closeNoteMenu();
+        return;
+      }
+
       if (isEditorVisible()) {
         event.preventDefault();
         closeEditorPanel();
@@ -402,8 +471,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const key = event.key.toLowerCase();
     if (key === 'k') {
       event.preventDefault();
-      searchInput.focus();
-      searchInput.select();
+      getVisibleSearchInput()?.focus();
+      getVisibleSearchInput()?.select();
       return;
     }
 
@@ -427,8 +496,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.addEventListener('click', () => {
+  document.addEventListener('click', (event) => {
     contextMenu.style.display = 'none';
+
+    if (noteMenu && event.target instanceof Node && !noteMenu.contains(event.target)) {
+      closeNoteMenu();
+    }
   });
 
   window.addEventListener('storage', (event) => {
@@ -462,6 +535,77 @@ document.addEventListener('DOMContentLoaded', () => {
       createSubNote(noteId);
     }
   });
+
+  function isNoteMenuOpen() {
+    return noteMenu?.classList.contains('is-open') ?? false;
+  }
+
+  function openNoteMenu() {
+    if (!noteMenu || !noteMenuBtn || !noteMenuPanel || noteMenuBtn.disabled) return;
+
+    noteMenu.classList.add('is-open');
+    noteMenuPanel.hidden = false;
+    noteMenuBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeNoteMenu() {
+    if (!noteMenu || !noteMenuBtn || !noteMenuPanel) return;
+
+    noteMenu.classList.remove('is-open');
+    noteMenuPanel.hidden = true;
+    noteMenuBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function toggleNoteMenu() {
+    if (isNoteMenuOpen()) {
+      closeNoteMenu();
+      return;
+    }
+
+    openNoteMenu();
+  }
+
+  function syncNoteMenuState() {
+    if (!noteMenuBtn) return;
+
+    const activeNote = activeNoteId ? findNoteById(activeNoteId) : null;
+    const canSaveFromMenu = !storageProtectionActive && (isMainEditorVisible() || isEditorVisible());
+
+    if (saveMenuBtn) {
+      saveMenuBtn.disabled = !canSaveFromMenu;
+    }
+
+    if (editBtn) {
+      editBtn.disabled = storageProtectionActive;
+    }
+
+    if (importBtn) {
+      importBtn.disabled = storageProtectionActive || !activeNote;
+    }
+
+    if (exportBtn) {
+      exportBtn.disabled = !activeNote;
+    }
+
+    if (topSideEditorBtn) {
+      topSideEditorBtn.disabled = storageProtectionActive;
+    }
+
+    if (topDesktopBtn) {
+      topDesktopBtn.hidden = !desktopBridge?.isElectron;
+      topDesktopBtn.disabled = storageProtectionActive || !desktopBridge?.isElectron;
+    }
+
+    const visibleButtons = [saveMenuBtn, editBtn, importBtn, exportBtn, topSideEditorBtn, topDesktopBtn]
+      .filter((button) => button && !button.hidden);
+    const hasEnabledAction = visibleButtons.some((button) => !button.disabled);
+
+    noteMenuBtn.disabled = !hasEnabledAction;
+
+    if (!hasEnabledAction) {
+      closeNoteMenu();
+    }
+  }
 
   function syncLauncherButton() {
     if (!editorLauncher) return;
@@ -579,6 +723,19 @@ document.addEventListener('DOMContentLoaded', () => {
     focusEditorField(source);
   }
 
+  function saveAndShowViewer(source) {
+    const savedNote = saveCurrentNote({ announce: true });
+    if (!savedNote) return;
+
+    showToast('笔记已保存。');
+
+    if (source === 'panel') {
+      closeEditorPanel(true);
+    }
+
+    showViewer(savedNote);
+  }
+
   function getDraftStatusText() {
     const note = draftNoteId ? findNoteById(draftNoteId) : null;
 
@@ -660,6 +817,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showEmptyState() {
+    activeTocHeadingId = '';
+    viewToc.classList.add('hidden');
     viewContainer.style.display = 'none';
     editorView.style.display = 'none';
     emptyState.style.display = 'flex';
@@ -675,6 +834,9 @@ document.addEventListener('DOMContentLoaded', () => {
     viewTitle.textContent = note.title || '无标题笔记';
     viewDate.textContent = `最后修改：${note.lastModified}`;
     viewContent.innerHTML = marked.parse(note.content || '');
+    if (viewBody) {
+      viewBody.scrollTop = 0;
+    }
     generateViewTOC();
   }
 
@@ -721,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     activeNoteId = null;
     showMainEditor(null, '新笔记 · 尚未保存');
-    renderNoteList(searchInput.value);
+    renderNoteList(getSearchQuery());
   }
 
   function createSubNote(parentId) {
@@ -747,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    renderNoteList(searchInput.value);
+    renderNoteList(getSearchQuery());
     showMainEditor(newNote, '新建子笔记 · 尚未保存');
     animateActiveNote(newNote.id);
   }
@@ -769,30 +931,32 @@ document.addEventListener('DOMContentLoaded', () => {
       ).forEach((note) => {
         noteListEl.appendChild(createNoteRow(note));
       });
+      syncNoteMenuState();
       return;
     }
 
     getSortedNotes(notes).forEach((note) => {
-      noteListEl.appendChild(createNoteTree(note));
+      noteListEl.appendChild(createNoteTree(note, 0));
     });
+    syncNoteMenuState();
   }
 
   function flattenNotes(list, output) {
     flattenNotesInTree(list, output);
   }
 
-  function createNoteTree(note) {
+  function createNoteTree(note, depth = 0) {
     const wrapper = document.createElement('div');
     wrapper.className = 'note-tree-item';
 
-    const row = createNoteRow(note, note.children.length > 0, expandedNoteIds.has(note.id));
+    const row = createNoteRow(note, note.children.length > 0, expandedNoteIds.has(note.id), depth);
     wrapper.appendChild(row);
 
     if (note.children.length > 0 && expandedNoteIds.has(note.id)) {
       const childrenContainer = document.createElement('div');
       childrenContainer.className = 'note-children expanded';
       getSortedNotes(note.children).forEach((child) => {
-        childrenContainer.appendChild(createNoteTree(child));
+        childrenContainer.appendChild(createNoteTree(child, depth + 1));
       });
       wrapper.appendChild(childrenContainer);
     }
@@ -800,10 +964,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return wrapper;
   }
 
-  function createNoteRow(note, hasChildren = false, isExpanded = false) {
+  function createNoteRow(note, hasChildren = false, isExpanded = false, depth = 0) {
     const row = document.createElement('div');
     row.className = `note-item ${activeNoteId === note.id ? 'active' : ''}`;
     row.dataset.id = String(note.id);
+    row.dataset.depth = String(depth);
 
     const content = document.createElement('div');
     content.className = 'note-item-content';
@@ -818,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           expandedNoteIds.add(note.id);
         }
-        renderNoteList(searchInput.value);
+        renderNoteList(getSearchQuery());
       });
       content.appendChild(toggle);
     } else {
@@ -869,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showViewer(note);
     }
 
-    renderNoteList(searchInput.value);
+    renderNoteList(getSearchQuery());
     animateActiveNote(id);
   }
 
@@ -941,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedNote = findNoteById(noteIdToSelect);
     renderViewer(savedNote);
     loadDraftFromNote(savedNote, options.announce ? `已保存：${savedNote.lastModified}` : `最后修改时间：${savedNote.lastModified}`);
-    renderNoteList(searchInput.value);
+    renderNoteList(getSearchQuery());
     animateActiveNote(noteIdToSelect);
 
     if (!isMainEditorVisible()) {
@@ -978,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
       draftLoaded = previousDraftLoaded;
       syncDraftInputs();
       applyStorageProtectionState();
-      renderNoteList(searchInput.value);
+      renderNoteList(getSearchQuery());
       return;
     }
     expandedNoteIds.delete(id);
@@ -993,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showEmptyState();
     }
 
-    renderNoteList(searchInput.value);
+    renderNoteList(getSearchQuery());
   }
 
   function showContextMenu(event, id) {
@@ -1010,16 +1175,56 @@ document.addEventListener('DOMContentLoaded', () => {
     contextMenu.dataset.noteId = String(id);
   }
 
+  function setActiveTocHeading(id) {
+    activeTocHeadingId = id || '';
+
+    viewTocList.querySelectorAll('a').forEach((anchor) => {
+      const isActive = anchor.dataset.targetId === activeTocHeadingId;
+      anchor.classList.toggle('is-active', isActive);
+      if (isActive) {
+        anchor.setAttribute('aria-current', 'true');
+      } else {
+        anchor.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function syncActiveTocHeading() {
+    if (!viewBody) {
+      return;
+    }
+
+    const headings = Array.from(viewContent.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+    if (headings.length === 0) {
+      setActiveTocHeading('');
+      return;
+    }
+
+    const viewBodyRect = viewBody.getBoundingClientRect();
+    const threshold = viewBodyRect.top + 96;
+    let nextActiveId = headings[0].id;
+
+    headings.forEach((heading) => {
+      if (heading.getBoundingClientRect().top <= threshold) {
+        nextActiveId = heading.id;
+      }
+    });
+
+    setActiveTocHeading(nextActiveId);
+  }
+
   function generateViewTOC() {
     viewTocList.innerHTML = '';
-    const headings = viewContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    const headings = Array.from(viewContent.querySelectorAll('h1, h2, h3, h4, h5, h6'));
 
     if (headings.length === 0) {
       viewToc.classList.add('hidden');
+      setActiveTocHeading('');
       return;
     }
 
     viewToc.classList.remove('hidden');
+    viewToc.scrollTop = 0;
 
     headings.forEach((heading, index) => {
       if (!heading.id) {
@@ -1031,14 +1236,21 @@ document.addEventListener('DOMContentLoaded', () => {
       anchor.href = `#${heading.id}`;
       anchor.textContent = heading.textContent || `标题 ${index + 1}`;
       anchor.className = `toc-h${heading.tagName.substring(1)}`;
+      anchor.dataset.targetId = heading.id;
       anchor.addEventListener('click', (event) => {
         event.preventDefault();
-        document.getElementById(heading.id)?.scrollIntoView({ behavior: 'smooth' });
+        setActiveTocHeading(heading.id);
+        document.getElementById(heading.id)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
       });
 
       li.appendChild(anchor);
       viewTocList.appendChild(li);
     });
+
+    syncActiveTocHeading();
   }
 
   function createHeadingId(text, index) {
@@ -1091,7 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showEmptyState();
     }
 
-    renderNoteList(searchInput.value);
+    renderNoteList(getSearchQuery());
   }
 
   function buildStorageProtectionMessage(result) {
@@ -1120,6 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editorLauncher,
       panelOpenMainBtn,
       editBtn,
+      inlineDesktopBtn,
       importBtn,
       panelSaveBtn,
       saveMainBtn,
@@ -1135,6 +1348,8 @@ document.addEventListener('DOMContentLoaded', () => {
         button.disabled = disableEditing;
       }
     });
+
+    syncNoteMenuState();
 
     if (!disableEditing) {
       return;

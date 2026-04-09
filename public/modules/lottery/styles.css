@@ -2,6 +2,7 @@
   --text-main: #ffffff;
   --text-muted: rgba(255, 255, 255, 0.75);
   --panel-border: rgba(255, 255, 255, 0.12);
+  --page-bg: #d1e8ff;
   --pink-1: #ff77b0;
   --pink-2: #f65493;
   --pink-3: #d93f7a;
@@ -20,12 +21,7 @@ body {
 body {
   font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
   color: var(--text-main);
-  background:
-    radial-gradient(circle at 12% 18%, rgba(77, 163, 255, 0.48), transparent 26%),
-    radial-gradient(circle at 88% 16%, rgba(190, 227, 255, 0.86), transparent 28%),
-    radial-gradient(circle at 14% 84%, rgba(77, 163, 255, 0.3), transparent 24%),
-    radial-gradient(circle at 86% 82%, rgba(77, 163, 255, 0.3), transparent 26%),
-    linear-gradient(180deg, #d1e8ff 0%, #c2ddff 52%, #d4e9ff 100%);
+  background: var(--page-bg);
   overflow-x: hidden;
 }
 
@@ -43,7 +39,7 @@ body::before {
   left: 8%;
   width: 78px;
   height: 78px;
-  background: rgba(77, 163, 255, 0.46);
+  display: none;
   border-radius: 45% 55% 50% 40%;
 }
 
@@ -52,7 +48,7 @@ body::after {
   bottom: 16%;
   width: 110px;
   height: 110px;
-  background: rgba(77, 163, 255, 0.38);
+  display: none;
   border-radius: 50%;
 }
 

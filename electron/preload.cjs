@@ -115,6 +115,41 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   platform: process.platform,
   moduleId: currentEntry?.moduleId || null,
   storageFilePath,
+  getMirroredStorageInfo() {
+    if (!currentEntry) {
+      return null
+    }
+
+    return ipcRenderer.invoke('desktop-storage:get-module-info', currentEntry.moduleId)
+  },
+  async chooseMirroredStorageDirectory() {
+    if (!currentEntry) {
+      return null
+    }
+
+    const result = await ipcRenderer.invoke('desktop-storage:choose-module-directory', currentEntry.moduleId)
+    if (!result?.canceled) {
+      storageFilePath = hydrateLocalStorage(currentEntry, true)
+    }
+    return {
+      ...result,
+      filePath: storageFilePath || result?.filePath || null,
+    }
+  },
+  async resetMirroredStorageDirectory() {
+    if (!currentEntry) {
+      return null
+    }
+
+    const result = await ipcRenderer.invoke('desktop-storage:reset-module-directory', currentEntry.moduleId)
+    if (!result?.canceled) {
+      storageFilePath = hydrateLocalStorage(currentEntry, true)
+    }
+    return {
+      ...result,
+      filePath: storageFilePath || result?.filePath || null,
+    }
+  },
   openJsonFile(options) {
     return ipcRenderer.invoke('desktop-files:open-json', options)
   },
@@ -126,6 +161,15 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   },
   savePastedNoteImage(dataUrl) {
     return ipcRenderer.invoke('desktop-notes:save-pasted-image', dataUrl)
+  },
+  savePhotographyPhoto(payload) {
+    return ipcRenderer.invoke('desktop-photography:save-photo', payload)
+  },
+  deletePhotographyPhoto(filePath) {
+    return ipcRenderer.invoke('desktop-photography:delete-photo', filePath)
+  },
+  deletePhotographyPhotos(filePaths) {
+    return ipcRenderer.invoke('desktop-photography:delete-photos', filePaths)
   },
   exportBackup() {
     return ipcRenderer.invoke('desktop-backup:export')

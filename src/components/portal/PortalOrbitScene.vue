@@ -175,7 +175,7 @@ defineExpose({
 </template>
 
 <style scoped>
-.portal-scene{position:relative;min-height:100vh;overflow:hidden;background:linear-gradient(180deg,rgba(3,8,16,.38),rgba(4,10,18,.56)),url('/assets/portal/space-bg.jpg') center/cover no-repeat}
+.portal-scene{position:relative;min-height:100vh;overflow:hidden;--scene-shift-y:clamp(-92px,-9vh,-56px);background:linear-gradient(180deg,rgba(3,8,16,.38),rgba(4,10,18,.56)),url('/assets/portal/space-bg.jpg') center/cover no-repeat}
 .portal-scene::before,.portal-scene::after{content:'';position:absolute;inset:0;pointer-events:none}
 .portal-scene::before{background:radial-gradient(circle at 50% 14%,rgba(255,255,255,.05),transparent 18%),linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.24))}
 .portal-scene::after{background-image:radial-gradient(circle at 14% 20%,rgba(255,255,255,.9) 0 1px,transparent 2px),radial-gradient(circle at 32% 72%,rgba(255,255,255,.75) 0 1px,transparent 2px),radial-gradient(circle at 58% 18%,rgba(255,255,255,.8) 0 1px,transparent 2px),radial-gradient(circle at 80% 68%,rgba(255,255,255,.68) 0 1px,transparent 2px);opacity:.34}
@@ -198,7 +198,7 @@ defineExpose({
 .info-link-travel{width:12px;height:12px;background:radial-gradient(circle at 34% 34%,rgba(255,255,255,.95),rgba(255,255,255,.2) 42%,transparent 70%),color-mix(in srgb,var(--connector-color) 84%,white 16%);box-shadow:0 0 18px color-mix(in srgb,var(--connector-color) 46%,transparent),0 0 34px color-mix(in srgb,var(--connector-color) 20%,transparent);animation:connector-travel 1.8s ease-in-out infinite}
 .info-link-dot{width:10px;height:10px;background:rgba(255,255,255,.94);box-shadow:0 0 18px rgba(255,255,255,.3)}
 .scene-shell{position:absolute;inset:0;display:grid;place-items:center}
-.solar-plane{position:relative;width:min(88vw,1040px);aspect-ratio:1;transform:scale(var(--scene-zoom));transition:transform .32s ease}
+.solar-plane{position:relative;width:min(88vw,1040px);aspect-ratio:1;transform:translateY(var(--scene-shift-y)) scale(var(--scene-zoom));transform-origin:center;transition:transform .32s ease}
 .sun-core{position:absolute;left:50%;top:50%;width:138px;height:138px;transform:translate(-50%,-50%);transition:transform 1s ease,filter .22s ease}
 .sun-glow,.sun-transition-glow,.sun-surface,.sun-transition-surface,.planet-ball>span{position:absolute;inset:0;border-radius:50%}
 .sun-glow{inset:-44px;background:radial-gradient(circle,rgba(255,186,78,.34),rgba(255,131,18,.14),transparent 74%);filter:blur(10px);transition:opacity 1s ease,transform 1s ease,filter .22s ease}
@@ -250,5 +250,5 @@ defineExpose({
 @keyframes burst-expand{from{clip-path:circle(0 at var(--burst-x) var(--burst-y));opacity:1}to{clip-path:circle(var(--burst-radius) at var(--burst-x) var(--burst-y));opacity:1}}
 @keyframes title-scan{0%{transform:translateX(-120%)}48%,100%{transform:translateX(120%)}}
 .music-status{position:absolute;left:24px;bottom:20px;z-index:5;max-width:min(420px,calc(100vw - 32px));padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(7,12,22,.48);backdrop-filter:blur(12px);color:rgba(236,242,255,.84);font-size:.76rem;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 12px 28px rgba(0,0,0,.18)}
-@media (max-width:760px){.system-title{top:18px;min-width:calc(100% - 28px);padding:10px 12px 12px}.system-title-chip,.system-title-meta{font-size:.56rem;letter-spacing:.24em}.system-title-main{font-size:clamp(.86rem,4vw,1.1rem);letter-spacing:.14em;text-align:center;white-space:normal;line-height:1.25}.solar-plane{width:min(100vw,680px)}.sun-core{width:110px;height:110px}.orbit-node{width:70px;height:70px}.planet-ball{width:38px;height:38px}.music-status{left:12px;bottom:12px;max-width:calc(100vw - 24px);font-size:.7rem}}
+@media (max-width:760px){.portal-scene{--scene-shift-y:clamp(-58px,-7vh,-32px)}.system-title{top:18px;min-width:calc(100% - 28px);padding:10px 12px 12px}.system-title-chip,.system-title-meta{font-size:.56rem;letter-spacing:.24em}.system-title-main{font-size:clamp(.86rem,4vw,1.1rem);letter-spacing:.14em;text-align:center;white-space:normal;line-height:1.25}.solar-plane{width:min(100vw,680px)}.sun-core{width:110px;height:110px}.orbit-node{width:70px;height:70px}.planet-ball{width:38px;height:38px}.music-status{left:12px;bottom:12px;max-width:calc(100vw - 24px);font-size:.7rem}}
 </style>

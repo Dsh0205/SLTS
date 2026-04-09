@@ -1,621 +1,77 @@
 <!doctype html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>四象限图</title>
-  <style>
-    :root {
-      --bg: #000000;
-      --line: rgba(255, 255, 255, 0.9);
-      --dot: #ffffff;
-      --label: rgba(255, 255, 255, 0.9);
-      --quadrant-text: rgba(255, 255, 255, 0.08);
-      --note-bg: #ffffff;
-      --note-border: #ffffff;
-      --note-text: #111111;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      overflow: hidden;
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      color: #ffffff;
-      user-select: none;
-    }
-
-    .stage {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      background: var(--bg);
-    }
-
-    .axis-line {
-      position: absolute;
-      pointer-events: none;
-      z-index: 3;
-      background: var(--line);
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
-      opacity: 0;
-    }
-
-    .axis-line.horizontal {
-      left: 0;
-      top: 50%;
-      width: 100%;
-      height: 2px;
-      transform: translateY(-1px) scaleX(0);
-      transform-origin: center center;
-      animation: axis-grow-x 0.9s ease forwards;
-      animation-delay: 0.28s;
-    }
-
-    .axis-line.vertical {
-      left: 50%;
-      top: 0;
-      width: 2px;
-      height: 100%;
-      transform: translateX(-1px) scaleY(0);
-      transform-origin: center center;
-      animation: axis-grow-y 0.9s ease forwards;
-      animation-delay: 0.28s;
-    }
-
-    .axis-label {
-      position: absolute;
-      z-index: 4;
-      color: var(--label);
-      font-size: 14px;
-      letter-spacing: 0.16em;
-      pointer-events: none;
-    }
-
-    .axis-label.time {
-      left: calc(50% + 12px);
-      top: 16px;
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-    }
-
-    .axis-label.important {
-      right: 18px;
-      top: calc(50% - 28px);
-    }
-
-    .center-dot {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 8px;
-      height: 8px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: var(--dot);
-      box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
-      z-index: 4;
-      pointer-events: none;
-      opacity: 0;
-      animation: dot-appear 0.3s ease forwards;
-    }
-
-    .quadrants {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr 1fr;
-      z-index: 1;
-    }
-
-    .quadrant {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .quadrant::before {
-      content: attr(data-label);
-      position: absolute;
-      inset: 50% auto auto 50%;
-      transform: translate(-50%, -50%);
-      color: var(--quadrant-text);
-      font-size: clamp(2.8rem, 7vw, 6rem);
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      white-space: nowrap;
-      pointer-events: none;
-      text-transform: uppercase;
-      opacity: 0;
-      filter: blur(10px);
-      animation: quadrant-fade-in 1.1s ease forwards;
-      animation-delay: 1.12s;
-    }
-
-    .notes-layer {
-      position: absolute;
-      inset: 0;
-      z-index: 5;
-      pointer-events: none;
-    }
-
-    .note-box {
-      position: absolute;
-      display: flex;
-      flex-direction: column;
-      border: 1px solid var(--note-border);
-      background: var(--note-bg);
-      color: var(--note-text);
-      border-radius: 3px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-      pointer-events: auto;
-      user-select: text;
-      overflow: hidden;
-      backdrop-filter: blur(2px);
-    }
-
-    .note-box.is-entering {
-      opacity: 0;
-      transform: scale(0.72) translateY(18px);
-      animation: note-pop-in 0.48s cubic-bezier(0.18, 0.86, 0.22, 1.15) forwards;
-      animation-delay: var(--enter-delay, 2.2s);
-    }
-
-    .note-box.is-cutting {
-      animation: note-cut-out 0.28s ease forwards;
-    }
-
-    .note-box.is-cutting::after {
-      content: "";
-      position: absolute;
-      left: -12%;
-      top: 50%;
-      width: 145%;
-      height: 2px;
-      background: rgba(255, 255, 255, 0.95);
-      transform: translateY(-50%) rotate(-28deg);
-      box-shadow: 0 0 16px rgba(255, 255, 255, 0.92);
-      pointer-events: none;
-    }
-
-    .note-handle {
-      min-height: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-      background:
-        radial-gradient(circle at 20% 50%, rgba(0, 0, 0, 0.16) 0 1px, transparent 2px),
-        radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.16) 0 1px, transparent 2px),
-        radial-gradient(circle at 80% 50%, rgba(0, 0, 0, 0.16) 0 1px, transparent 2px),
-        rgba(0, 0, 0, 0.03);
-      cursor: grab;
-      user-select: none;
-    }
-
-    .note-handle:active {
-      cursor: grabbing;
-    }
-
-    .note-content {
-      flex: 1;
-      width: 100%;
-      padding: 8px;
-      outline: none;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-size: 14px;
-      line-height: 1.4;
-      color: var(--note-text);
-      user-select: text;
-    }
-
-    .note-resize {
-      position: absolute;
-      right: 0;
-      bottom: 0;
-      width: 18px;
-      height: 18px;
-      cursor: nwse-resize;
-      background:
-        linear-gradient(135deg, transparent 0 50%, rgba(0, 0, 0, 0.16) 50% 58%, transparent 58% 100%);
-    }
-
-    .hint {
-      position: absolute;
-      left: 14px;
-      bottom: 12px;
-      z-index: 6;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.72);
-      pointer-events: none;
-      letter-spacing: 0.04em;
-    }
-
-    @keyframes note-cut-out {
-      0% {
-        opacity: 1;
-        transform: scale(1) rotate(0deg);
-      }
-      100% {
-        opacity: 0;
-        transform: scale(0.92) rotate(-3deg);
-      }
-    }
-
-    @keyframes dot-appear {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.3);
-      }
-      100% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-    }
-
-    @keyframes axis-grow-x {
-      0% {
-        opacity: 1;
-        transform: translateY(-1px) scaleX(0);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(-1px) scaleX(1);
-      }
-    }
-
-    @keyframes axis-grow-y {
-      0% {
-        opacity: 1;
-        transform: translateX(-1px) scaleY(0);
-      }
-      100% {
-        opacity: 1;
-        transform: translateX(-1px) scaleY(1);
-      }
-    }
-
-    @keyframes quadrant-fade-in {
-      0% {
-        opacity: 0;
-        filter: blur(10px);
-      }
-      100% {
-        opacity: 1;
-        filter: blur(0);
-      }
-    }
-
-    @keyframes note-pop-in {
-      0% {
-        opacity: 0;
-        transform: scale(0.72) translateY(18px);
-      }
-      60% {
-        opacity: 1;
-        transform: scale(1.04) translateY(-4px);
-      }
-      100% {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-      }
-    }
-  </style>
+  <title>快捷绘图板</title>
+  <link rel="stylesheet" href="../shared/reveal.css">
+  <link rel="stylesheet" href="./styles.css">
 </head>
-
 <body>
-  <main id="stage" class="stage">
-    <div class="quadrants" id="quadrants">
-      <section class="quadrant" data-quadrant="Q2" data-label="差事" aria-label="第二象限"></section>
-      <section class="quadrant" data-quadrant="Q1" data-label="DDL" aria-label="第一象限"></section>
-      <section class="quadrant" data-quadrant="Q3" data-label="想象" aria-label="第三象限"></section>
-      <section class="quadrant" data-quadrant="Q4" data-label="规划" aria-label="第四象限"></section>
-    </div>
+  <main class="board-shell">
+    <section class="board-stage" aria-label="快捷绘图板">
+      <div class="board-toolbar" role="toolbar" aria-label="画布工具">
+        <button id="create-timeline-btn" class="tool-btn" type="button" title="创建时间线">
+          <span aria-hidden="true">L</span>
+        </button>
+        <button id="create-note-btn" class="tool-btn" type="button" title="创建文本">
+          <span aria-hidden="true">T</span>
+        </button>
+        <button id="create-box-btn" class="tool-btn" type="button" title="添加流程图节点">
+          <span aria-hidden="true">B</span>
+        </button>
+        <div class="tool-divider" aria-hidden="true"></div>
+        <button id="zoom-out-btn" class="tool-btn" type="button" title="缩小">
+          <span aria-hidden="true">-</span>
+        </button>
+        <button id="zoom-reset-btn" class="tool-btn tool-btn--label" type="button" title="重置缩放">1:1</button>
+        <button id="zoom-in-btn" class="tool-btn" type="button" title="放大">
+          <span aria-hidden="true">+</span>
+        </button>
+        <div class="tool-divider" aria-hidden="true"></div>
+        <button id="export-png-btn" class="tool-btn" type="button" title="导出 PNG">
+          <span aria-hidden="true">P</span>
+        </button>
+        <button id="clear-all-btn" class="tool-btn tool-btn--danger" type="button" title="清空画布">
+          <span aria-hidden="true">X</span>
+        </button>
+      </div>
 
-    <div class="axis-line horizontal" aria-hidden="true"></div>
-    <div class="axis-line vertical" aria-hidden="true"></div>
-    <div class="axis-label time" aria-hidden="true">时间</div>
-    <div class="axis-label important" aria-hidden="true">重要</div>
-    <div class="center-dot" aria-hidden="true"></div>
+      <div id="empty-state" class="empty-state">
+        右键方框可切换 Lucidchart Flowchart Symbols，点击时间线刻度可直接添加文本。
+      </div>
 
-    <section id="notes-layer" class="notes-layer" aria-label="四象限文本框"></section>
-    <p class="hint">右键空白处新建方框，拖顶边可移动，长按顶边可切开删除，拖右下角可改大小</p>
+      <div id="status-text" class="board-status">画布已就绪。</div>
+
+      <div id="viewport" class="board-viewport">
+        <div id="world-sizer" class="board-world-sizer">
+          <div id="world" class="board-world">
+            <svg id="links-layer" class="links-layer" aria-hidden="true">
+              <defs>
+                <marker id="arrow-head" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                  <path d="M 0 0 L 12 6 L 0 12 z"></path>
+                </marker>
+              </defs>
+              <g id="links-paths"></g>
+            </svg>
+            <div id="timelines-layer" class="object-layer timelines-layer"></div>
+            <div id="notes-layer" class="object-layer notes-layer"></div>
+            <div id="boxes-layer" class="object-layer boxes-layer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="context-menu" class="context-menu" hidden>
+        <button type="button" class="context-menu-btn" data-action="create-note">创建文本</button>
+        <button type="button" class="context-menu-btn" data-action="clear-text">清空文本</button>
+        <button type="button" class="context-menu-btn" data-action="delete-item">删除元素</button>
+        <button id="batch-link-menu-btn" type="button" class="context-menu-btn" data-action="toggle-batch-link" hidden>批量连线</button>
+        <div id="box-shape-divider" class="context-menu-divider" hidden></div>
+        <div id="box-shape-menu" class="context-menu-shapes" hidden></div>
+      </div>
+    </section>
   </main>
 
-  <script>
-    const STORAGE_KEY = "quadrant-notes-v1";
-    const NOTE_SIZE = 120;
-    const PADDING = 8;
-    const LONG_PRESS_MS = 550;
-    const DRAG_THRESHOLD = 6;
-    const NOTE_ENTER_BASE_DELAY = 2200;
-    const NOTE_ENTER_STAGGER = 90;
-
-    const stage = document.getElementById("stage");
-    const quadrants = document.getElementById("quadrants");
-    const notesLayer = document.getElementById("notes-layer");
-
-    let notes = loadNotes();
-    let dragState = null;
-
-    function loadNotes() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(parsed)) return [];
-        return parsed.filter((item) =>
-          item &&
-          Number.isFinite(item.x) &&
-          Number.isFinite(item.y) &&
-          typeof item.text === "string" &&
-          typeof item.id === "string"
-        ).map((item) => ({
-          ...item,
-          width: Number.isFinite(item.width) ? item.width : NOTE_SIZE,
-          height: Number.isFinite(item.height) ? item.height : NOTE_SIZE,
-        }));
-      } catch {
-        return [];
-      }
-    }
-
-    function saveNotes() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-    }
-
-    function createId() {
-      return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    }
-
-    function clamp(value, min, max) {
-      return Math.min(Math.max(value, min), max);
-    }
-
-    function getNoteById(id) {
-      return notes.find((item) => item.id === id) || null;
-    }
-
-    function renderNotes(animateIds = []) {
-      notesLayer.innerHTML = "";
-      for (const [index, note] of notes.entries()) {
-        const wrapper = document.createElement("article");
-        wrapper.className = "note-box";
-        if (animateIds.includes(note.id)) {
-          wrapper.classList.add("is-entering");
-          wrapper.style.setProperty("--enter-delay", `${NOTE_ENTER_BASE_DELAY + index * NOTE_ENTER_STAGGER}ms`);
-        }
-        wrapper.style.left = `${note.x}px`;
-        wrapper.style.top = `${note.y}px`;
-        wrapper.style.width = `${note.width}px`;
-        wrapper.style.height = `${note.height}px`;
-        wrapper.dataset.id = note.id;
-
-        const handle = document.createElement("div");
-        handle.className = "note-handle";
-        handle.dataset.id = note.id;
-
-        const content = document.createElement("div");
-        content.className = "note-content";
-        content.contentEditable = "true";
-        content.spellcheck = false;
-        content.dataset.id = note.id;
-        content.textContent = note.text;
-
-        const resize = document.createElement("div");
-        resize.className = "note-resize";
-        resize.dataset.id = note.id;
-
-        wrapper.appendChild(handle);
-        wrapper.appendChild(content);
-        wrapper.appendChild(resize);
-        notesLayer.appendChild(wrapper);
-      }
-    }
-
-    function removeNoteById(id) {
-      notes = notes.filter((item) => item.id !== id);
-      saveNotes();
-      renderNotes();
-    }
-
-    function animateCutAndRemove(id, box) {
-      if (!(box instanceof HTMLElement)) {
-        removeNoteById(id);
-        return;
-      }
-
-      box.classList.add("is-cutting");
-      window.setTimeout(() => {
-        removeNoteById(id);
-      }, 240);
-    }
-
-    function createNoteAt(clientX, clientY, quadrantName) {
-      const rect = stage.getBoundingClientRect();
-      const maxX = Math.max(PADDING, rect.width - NOTE_SIZE - PADDING);
-      const maxY = Math.max(PADDING, rect.height - NOTE_SIZE - PADDING);
-      const x = clamp(clientX - rect.left - NOTE_SIZE / 2, PADDING, maxX);
-      const y = clamp(clientY - rect.top - NOTE_SIZE / 2, PADDING, maxY);
-
-      notes.push({
-        id: createId(),
-        x,
-        y,
-        width: NOTE_SIZE,
-        height: NOTE_SIZE,
-        quadrant: quadrantName,
-        text: "",
-      });
-
-      saveNotes();
-      renderNotes();
-
-      const latest = notesLayer.querySelector(`.note-content[data-id="${notes.at(-1).id}"]`);
-      latest?.focus();
-    }
-
-    quadrants.addEventListener("contextmenu", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest(".note-box")) return;
-
-      const quadrant = target.closest(".quadrant");
-      if (!quadrant) return;
-
-      event.preventDefault();
-      createNoteAt(event.clientX, event.clientY, quadrant.dataset.quadrant || "");
-    });
-
-    notesLayer.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-
-      const handle = target.closest(".note-handle");
-      if (!(handle instanceof HTMLElement)) return;
-
-      const box = handle.closest(".note-box");
-      if (!(box instanceof HTMLElement)) return;
-
-      const id = box.dataset.id;
-      const note = id ? getNoteById(id) : null;
-      if (!note) return;
-
-      const rect = box.getBoundingClientRect();
-      dragState = {
-        id,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        offsetX: event.clientX - rect.left,
-        offsetY: event.clientY - rect.top,
-        moved: false,
-        longPressTriggered: false,
-        timer: window.setTimeout(() => {
-          if (!dragState || dragState.id !== id || dragState.moved) return;
-          dragState.longPressTriggered = true;
-          animateCutAndRemove(id, box);
-          dragState = null;
-        }, LONG_PRESS_MS),
-      };
-
-      handle.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
-    });
-
-    notesLayer.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-
-      const resize = target.closest(".note-resize");
-      if (!(resize instanceof HTMLElement)) return;
-
-      const box = resize.closest(".note-box");
-      if (!(box instanceof HTMLElement)) return;
-
-      const id = box.dataset.id;
-      const note = id ? getNoteById(id) : null;
-      if (!note) return;
-
-      dragState = {
-        id,
-        pointerId: event.pointerId,
-        mode: "resize",
-        startX: event.clientX,
-        startY: event.clientY,
-        startWidth: note.width,
-        startHeight: note.height,
-      };
-
-      resize.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
-    });
-
-    notesLayer.addEventListener("pointermove", (event) => {
-      if (!dragState || dragState.pointerId !== event.pointerId) return;
-
-      if (dragState.mode === "resize") {
-        const note = getNoteById(dragState.id);
-        const box = notesLayer.querySelector(`.note-box[data-id="${dragState.id}"]`);
-        if (!note || !(box instanceof HTMLElement)) return;
-
-        const stageRect = stage.getBoundingClientRect();
-        const maxWidth = Math.max(80, stageRect.width - note.x - PADDING);
-        const maxHeight = Math.max(80, stageRect.height - note.y - PADDING);
-        note.width = clamp(dragState.startWidth + (event.clientX - dragState.startX), 80, maxWidth);
-        note.height = clamp(dragState.startHeight + (event.clientY - dragState.startY), 80, maxHeight);
-        box.style.width = `${note.width}px`;
-        box.style.height = `${note.height}px`;
-        return;
-      }
-
-      const dx = event.clientX - dragState.startX;
-      const dy = event.clientY - dragState.startY;
-
-      if (!dragState.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
-        dragState.moved = true;
-        window.clearTimeout(dragState.timer);
-      }
-
-      if (!dragState.moved || dragState.longPressTriggered) return;
-
-      const note = getNoteById(dragState.id);
-      const box = notesLayer.querySelector(`.note-box[data-id="${dragState.id}"]`);
-      if (!note || !(box instanceof HTMLElement)) return;
-
-      const rect = stage.getBoundingClientRect();
-      const maxX = Math.max(PADDING, rect.width - note.width - PADDING);
-      const maxY = Math.max(PADDING, rect.height - note.height - PADDING);
-      note.x = clamp(event.clientX - rect.left - dragState.offsetX, PADDING, maxX);
-      note.y = clamp(event.clientY - rect.top - dragState.offsetY, PADDING, maxY);
-      box.style.left = `${note.x}px`;
-      box.style.top = `${note.y}px`;
-    });
-
-    function finishDrag(event) {
-      if (!dragState || dragState.pointerId !== event.pointerId) return;
-      window.clearTimeout(dragState.timer);
-      if (dragState.mode === "resize") {
-        saveNotes();
-        dragState = null;
-        return;
-      }
-      if (dragState.moved && !dragState.longPressTriggered) {
-        saveNotes();
-      }
-      dragState = null;
-    }
-
-    notesLayer.addEventListener("pointerup", finishDrag);
-    notesLayer.addEventListener("pointercancel", finishDrag);
-
-    notesLayer.addEventListener("input", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      if (!target.classList.contains("note-content")) return;
-
-      const id = target.dataset.id;
-      if (!id) return;
-
-      const note = getNoteById(id);
-      if (!note) return;
-      note.text = target.textContent || "";
-      saveNotes();
-    });
-
-    renderNotes(notes.map((note) => note.id));
-  </script>
+  <script type="module" src="./app.js"></script>
 </body>
-
 </html>

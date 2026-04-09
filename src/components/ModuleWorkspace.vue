@@ -38,10 +38,13 @@ onBeforeUnmount(() => {
     <button
       class="back-button"
       type="button"
+      aria-label="返回主页"
+      title="返回主页"
       @click="emit('back')"
     >
-      <span class="back-button-icon" aria-hidden="true">←</span>
-      <span>返回主页</span>
+      <svg class="back-button-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14.75 5.75 8.5 12l6.25 6.25" />
+      </svg>
     </button>
     <iframe
       :key="frameKey"
@@ -74,43 +77,40 @@ onBeforeUnmount(() => {
   top: 18px;
   left: 18px;
   z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
   border: 1px solid color-mix(in srgb, var(--module-color-soft) 28%, rgba(255, 255, 255, 0.12));
-  border-radius: 999px;
-  padding: 10px 18px 10px 14px;
-  background: color-mix(in srgb, var(--module-color) 16%, rgba(8, 14, 26, 0.82));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--module-color) 18%, rgba(8, 14, 26, 0.84));
   color: #f5f7ff;
   font: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
   cursor: pointer;
   backdrop-filter: blur(12px);
   box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.24),
+    0 10px 22px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .back-button-icon {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--module-color-soft) 18%, rgba(255, 255, 255, 0.08));
-  font-size: 0.95rem;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .back-button:hover {
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--module-color) 24%, rgba(12, 20, 36, 0.92));
+  background: color-mix(in srgb, var(--module-color) 28%, rgba(12, 20, 36, 0.92));
   border-color: color-mix(in srgb, var(--module-color-soft) 40%, rgba(255, 255, 255, 0.2));
   box-shadow:
-    0 14px 28px color-mix(in srgb, var(--module-color) 18%, rgba(0, 0, 0, 0.28)),
+    0 14px 28px color-mix(in srgb, var(--module-color) 18%, rgba(0, 0, 0, 0.24)),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -134,8 +134,14 @@ onBeforeUnmount(() => {
   .back-button {
     top: 14px;
     left: 14px;
-    padding: 9px 15px 9px 12px;
-    font-size: 0.9rem;
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+  }
+
+  .back-button-icon {
+    width: 17px;
+    height: 17px;
   }
 }
 </style>

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SHANLIC LIFE - 笔记</title>
+  <title>SHANLIC LIFE - Notes</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -18,6 +18,13 @@
       <div class="sidebar-header">
         <img src="logo.jpg" alt="SHANLIC LIFE" class="logo">
         <button id="add-note-btn" title="新建笔记"><i class="fas fa-plus"></i></button>
+      </div>
+      <div class="sidebar-search">
+        <div class="search-container">
+          <i class="fas fa-search"></i>
+          <input type="text" id="sidebar-search-input" placeholder="搜索笔记">
+          <span class="shortcut-hint">Ctrl K</span>
+        </div>
       </div>
       <div class="note-list" id="note-list"></div>
     </div>
@@ -35,14 +42,43 @@
         </div>
 
         <div class="top-actions">
-          <button id="side-editor-toggle-btn" class="header-action-btn" type="button" title="打开侧边小窗">
-            <i class="fas fa-table-columns"></i>
-            <span>侧边小窗</span>
-          </button>
-          <button id="desktop-floating-btn" class="header-action-btn desktop-only" type="button" title="打开桌面悬浮窗">
-            <i class="fas fa-note-sticky"></i>
-            <span>桌面悬浮窗</span>
-          </button>
+          <div class="note-menu" id="note-menu">
+            <button id="note-menu-btn" class="note-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+              <i class="fas fa-note-sticky"></i>
+              <span>NOTE</span>
+              <i class="fas fa-chevron-down note-menu-caret"></i>
+            </button>
+
+            <div id="note-menu-panel" class="note-menu-panel" role="menu" hidden>
+              <button id="note-menu-save-btn" class="note-menu-item" type="button" role="menuitem">
+                <i class="fas fa-floppy-disk"></i>
+                <span>保存笔记</span>
+              </button>
+              <button id="note-menu-edit-btn" class="note-menu-item" type="button" role="menuitem">
+                <i class="fas fa-pen"></i>
+                <span>编辑笔记</span>
+              </button>
+              <button id="note-menu-import-btn" class="note-menu-item" type="button" role="menuitem">
+                <i class="fas fa-file-import"></i>
+                <span>导入 .txt</span>
+              </button>
+              <button id="note-menu-export-btn" class="note-menu-item" type="button" role="menuitem">
+                <i class="fas fa-file-export"></i>
+                <span>导出 .txt</span>
+              </button>
+              <div class="note-menu-divider" aria-hidden="true"></div>
+              <button id="note-menu-side-panel-btn" class="note-menu-item" type="button" role="menuitem">
+                <i class="fas fa-table-columns"></i>
+                <span>侧边小窗</span>
+              </button>
+              <button id="note-menu-desktop-btn" class="note-menu-item" type="button" role="menuitem">
+                <i class="fas fa-window-restore"></i>
+                <span>悬浮窗口</span>
+              </button>
+            </div>
+          </div>
+
+          <input type="file" id="import-file-input" accept=".txt" style="display: none;">
         </div>
       </div>
 
@@ -51,19 +87,6 @@
           <h1 id="view-title">笔记标题</h1>
           <div class="view-actions">
             <span id="view-date">最后修改：-</span>
-            <button id="import-note-btn" class="action-btn" title="导入 .txt">
-              <i class="fas fa-file-import"></i>
-              导入
-            </button>
-            <button id="export-note-btn" class="action-btn" title="导出 .txt">
-              <i class="fas fa-file-export"></i>
-              导出
-            </button>
-            <button id="edit-note-btn" class="edit-btn" type="button">
-              <i class="fas fa-pen"></i>
-              正常编辑
-            </button>
-            <input type="file" id="import-file-input" accept=".txt" style="display: none;">
           </div>
         </div>
 
@@ -161,19 +184,14 @@
 
           <div class="content-area">
             <textarea id="main-note-content"
-              placeholder="在这里编辑内容，支持 Markdown 标题、列表、引用、代码块，也支持直接粘贴图片。"></textarea>
+              placeholder="在这里编辑内容，支持 Markdown、列表、引用、代码块，也支持直接粘贴图片。"></textarea>
           </div>
 
           <button id="submit-note-btn" class="submit-btn" type="button">保存笔记</button>
         </div>
       </div>
 
-      <button id="editor-launcher" class="editor-launcher" type="button" title="打开侧边小窗">
-        <i class="fas fa-note-sticky"></i>
-        <span>侧边小窗</span>
-      </button>
-
-      <div class="editor-container" id="editor-container" aria-label="侧边小窗编辑器">
+      <div id="editor-container" class="editor-container" aria-label="侧边小窗编辑器">
         <div class="editor-panel-header">
           <div>
             <div class="panel-kicker">Quick Panel</div>
@@ -184,12 +202,12 @@
           </button>
         </div>
 
-        <p class="panel-caption">这里适合快速补几句话，完整格式化编辑依然保留在主编辑区。</p>
+        <p class="panel-caption">这里适合快速补几句内容，完整排版编辑依然保留在主编辑区。</p>
 
         <input type="text" id="side-note-title" placeholder="小窗标题...">
 
         <div class="panel-body">
-          <textarea id="side-note-content" placeholder="快速记录一段内容..."></textarea>
+          <textarea id="side-note-content" placeholder="快速记下一段内容..."></textarea>
         </div>
 
         <div class="panel-actions">
