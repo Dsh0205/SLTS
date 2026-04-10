@@ -91,6 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const panelContentInput = document.getElementById('side-note-content');
   const panelStatus = document.getElementById('panel-status');
   const toast = document.getElementById('notes-toast');
+  const noteImageLightbox = document.getElementById('note-image-lightbox');
+  const noteImageLightboxImage = document.getElementById('note-image-lightbox-image');
+  const noteImageLightboxCaption = document.getElementById('note-image-lightbox-caption');
+  const noteImageLightboxCloseBtn = document.getElementById('note-image-lightbox-close-btn');
 
   const btnUndo = document.getElementById('btn-undo');
   const btnRedo = document.getElementById('btn-redo');
@@ -117,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnWidescreen = document.getElementById('btn-widescreen');
 
   const expandedNoteIds = new Set();
+  const collapsedNoteImageKeys = new Set();
   const handleMainEditorChange = () => handleDraftInput('main');
   let toastTimer = 0;
   let activeTocHeadingId = '';
@@ -164,6 +169,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   viewBody?.addEventListener('scroll', syncActiveTocHeading, { passive: true });
   window.addEventListener('resize', syncActiveTocHeading);
+  noteImageLightboxCloseBtn?.addEventListener('click', closeNoteImageLightbox);
+  noteImageLightbox?.addEventListener('click', (event) => {
+    if (event.target === noteImageLightbox) {
+      closeNoteImageLightbox();
+    }
+  });
 
   noteMenuBtn?.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -452,6 +463,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
+      if (!noteImageLightbox?.hidden) {
+        event.preventDefault();
+        closeNoteImageLightbox();
+        return;
+      }
+
       if (isNoteMenuOpen()) {
         event.preventDefault();
         closeNoteMenu();
@@ -630,9 +647,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function handleLauncherClick() {
+  async function handleLauncherClick() {
     if (desktopBridge?.isElectron) {
-      openDesktopFloatingEditor();
+      await openDesktopFloatingEditor();
       return;
     }
 
@@ -700,6 +717,133 @@ document.addEventListener('DOMContentLoaded', () => {
     toastTimer = window.setTimeout(() => {
       toast.classList.remove('show');
     }, 1800);
+  }
+
+  function enhanceRenderedNoteImages(note) {
+    const renderedImages = Array.from(viewContent.querySelectorAll('img'))
+      .filter((image) => !image.closest('.note-inline-figure'));
+
+    renderedImages.forEach((image, index) => {
+      const source = image.getAttribute('src') || image.currentSrc || '';
+      const imageName = getNoteImageDisplayName(source, image.getAttribute('alt'));
+      const imageKey = createNoteImageStateKey(note?.id ?? 'draft', source, index);
+
+      const wrapper = document.createElement('span');
+      wrapper.className = 'note-inline-figure';
+      wrapper.dataset.imageKey = imageKey;
+
+      const previewButton = document.createElement('button');
+      previewButton.type = 'button';
+      previewButton.className = 'note-inline-preview';
+      previewButton.dataset.imageSource = source;
+      previewButton.dataset.imageName = imageName;
+      previewButton.setAttribute('aria-label', `放大查看 ${imageName}`);
+      previewButton.addEventListener('click', () => {
+        openNoteImageLightbox(source, imageName, image.alt || imageName);
+      });
+
+      image.classList.add('note-inline-image');
+      image.dataset.noteImageEnhanced = 'true';
+      image.alt = image.alt || imageName;
+      image.replaceWith(wrapper);
+      previewButton.appendChild(image);
+
+      const meta = document.createElement('span');
+      meta.className = 'note-inline-meta';
+
+      const name = document.createElement('span');
+      name.className = 'note-inline-name';
+      name.textContent = imageName;
+
+      const toggleButton = document.createElement('button');
+      toggleButton.type = 'button';
+      toggleButton.className = 'note-inline-toggle';
+      toggleButton.addEventListener('click', () => {
+        const collapsed = !wrapper.classList.contains('is-collapsed');
+        updateCollapsedNoteImageState(imageKey, collapsed);
+        applyNoteImageCollapsedState(wrapper, collapsed);
+      });
+
+      meta.append(name, toggleButton);
+      wrapper.append(previewButton, meta);
+      applyNoteImageCollapsedState(wrapper, collapsedNoteImageKeys.has(imageKey));
+    });
+  }
+
+  function applyNoteImageCollapsedState(wrapper, collapsed) {
+    const previewButton = wrapper?.querySelector('.note-inline-preview');
+    const toggleButton = wrapper?.querySelector('.note-inline-toggle');
+    if (!(previewButton instanceof HTMLButtonElement) || !(toggleButton instanceof HTMLButtonElement)) return;
+
+    wrapper.classList.toggle('is-collapsed', collapsed);
+    previewButton.hidden = collapsed;
+    previewButton.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
+    toggleButton.textContent = collapsed ? '展开图片' : '收起图片';
+    toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
+  function updateCollapsedNoteImageState(imageKey, collapsed) {
+    if (!imageKey) return;
+    if (collapsed) {
+      collapsedNoteImageKeys.add(imageKey);
+      return;
+    }
+
+    collapsedNoteImageKeys.delete(imageKey);
+  }
+
+  function openNoteImageLightbox(source, imageName, altText = imageName) {
+    if (!noteImageLightbox || !noteImageLightboxImage || !noteImageLightboxCaption) return;
+
+    noteImageLightboxImage.src = source;
+    noteImageLightboxImage.alt = altText || imageName;
+    noteImageLightboxCaption.textContent = imageName;
+    noteImageLightbox.hidden = false;
+  }
+
+  function closeNoteImageLightbox() {
+    if (!noteImageLightbox || !noteImageLightboxImage || !noteImageLightboxCaption) return;
+
+    noteImageLightbox.hidden = true;
+    noteImageLightboxImage.src = '';
+    noteImageLightboxCaption.textContent = '';
+  }
+
+  function createNoteImageStateKey(noteId, source, index) {
+    return `${noteId || 'draft'}::${source || 'image'}::${index}`;
+  }
+
+  function getNoteImageDisplayName(source, fallbackText = '') {
+    const fromPath = extractNoteImageNameFromSource(source);
+    if (fromPath) return fromPath;
+
+    const fallback = String(fallbackText || '').trim();
+    return fallback || '图片';
+  }
+
+  function extractNoteImageNameFromSource(source) {
+    const raw = String(source || '').trim();
+    if (!raw) return '';
+
+    if (raw.startsWith('data:')) {
+      const match = raw.match(/^data:image\/([a-z0-9.+-]+)/i);
+      if (!match) return '内嵌图片';
+      const extension = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+      return `内嵌图片.${extension}`;
+    }
+
+    try {
+      const url = new URL(raw, window.location.href);
+      const segments = decodeURIComponent(url.pathname || '')
+        .split('/')
+        .filter(Boolean);
+      return segments.at(-1) || '';
+    } catch {
+      const segments = decodeURIComponent(raw)
+        .split(/[\\/]/)
+        .filter(Boolean);
+      return segments.at(-1) || '';
+    }
   }
 
   function focusEditorField(source) {
@@ -818,6 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showEmptyState() {
     activeTocHeadingId = '';
+    closeNoteImageLightbox();
     viewToc.classList.add('hidden');
     viewContainer.style.display = 'none';
     editorView.style.display = 'none';
@@ -831,9 +976,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    closeNoteImageLightbox();
     viewTitle.textContent = note.title || '无标题笔记';
     viewDate.textContent = `最后修改：${note.lastModified}`;
     viewContent.innerHTML = marked.parse(note.content || '');
+    enhanceRenderedNoteImages(note);
     if (viewBody) {
       viewBody.scrollTop = 0;
     }
@@ -854,6 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showMainEditor(note, statusText) {
+    closeNoteImageLightbox();
     loadDraftFromNote(note, statusText);
     editorView.style.display = 'flex';
     viewContainer.style.display = 'none';
@@ -1386,15 +1534,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return hydrateNotesFromStorage(list);
   }
 
-  function openDesktopFloatingEditor() {
+  async function openDesktopFloatingEditor() {
     if (!desktopBridge?.openFloatingNotesWindow) return false;
 
     const latest = hasUnsavedChanges() ? saveCurrentNote({ announce: false }) : (activeNoteId ? findNoteById(activeNoteId) : null);
     if (hasUnsavedChanges() && !latest) {
+      showToast('当前笔记保存失败，暂时无法打开悬浮窗口');
       return false;
     }
-    desktopBridge.openFloatingNotesWindow(latest?.id ?? activeNoteId ?? null);
-    return true;
+
+    try {
+      const result = await desktopBridge.openFloatingNotesWindow(latest?.id ?? activeNoteId ?? null);
+      if (!result?.ok) {
+        showToast('悬浮窗口打开失败，请重试');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast('悬浮窗口打开失败，请重试');
+      return false;
+    }
   }
 
   function applyHeadingLevel(level) {

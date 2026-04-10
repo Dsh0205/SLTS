@@ -4,21 +4,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>每日大赛</title>
+  <title>Animate 页面</title>
   <link rel="stylesheet" href="../shared/reveal.css">
   <style>
     :root {
-      --bg: #150d08;
-      --bg-soft: #2d180e;
-      --text: #ffe6cf;
-      --muted: #d3ab85;
-      --card: linear-gradient(180deg, rgba(35, 20, 10, 0.98), rgba(22, 13, 8, 0.96));
-      --border: rgba(255, 152, 61, 0.3);
-      --primary: #ff8f3d;
-      --primary-contrast: #1d1008;
-      --accent: #ffb15f;
-      --danger: #ff7a45;
-      --shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
+      --bg: #120507;
+      --bg-soft: #22090d;
+      --text: #ffe7ea;
+      --muted: #d5a6ad;
+      --card: linear-gradient(180deg, rgba(29, 9, 12, 0.98), rgba(18, 5, 7, 0.96));
+      --border: rgba(255, 78, 102, 0.26);
+      --primary: #ff4e66;
+      --primary-contrast: #fff4f6;
+      --accent: #ff7b8d;
+      --danger: #ff6f61;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
     }
 
     * {
@@ -36,11 +36,11 @@
       font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at 10% 18%, rgba(255, 143, 61, 0.22), transparent 22%),
-        radial-gradient(circle at 88% 14%, rgba(255, 200, 126, 0.18), transparent 28%),
-        radial-gradient(circle at 16% 84%, rgba(255, 143, 61, 0.16), transparent 22%),
-        radial-gradient(circle at 84% 84%, rgba(255, 143, 61, 0.14), transparent 24%),
-        linear-gradient(180deg, #1c120c 0%, #120b07 100%);
+        radial-gradient(circle at 12% 18%, rgba(255, 78, 102, 0.24), transparent 24%),
+        radial-gradient(circle at 88% 16%, rgba(255, 123, 141, 0.18), transparent 28%),
+        radial-gradient(circle at 16% 84%, rgba(255, 78, 102, 0.18), transparent 22%),
+        radial-gradient(circle at 84% 82%, rgba(255, 91, 119, 0.16), transparent 24%),
+        linear-gradient(180deg, #190709 0%, #0c0204 100%);
     }
 
     body::before,
@@ -58,7 +58,7 @@
       height: 220px;
       top: -72px;
       right: -54px;
-      background: rgba(255, 143, 61, 0.16);
+      background: rgba(255, 78, 102, 0.18);
     }
 
     body::after {
@@ -66,7 +66,7 @@
       height: 180px;
       left: -44px;
       bottom: -50px;
-      background: rgba(255, 177, 95, 0.14);
+      background: rgba(255, 123, 141, 0.14);
     }
 
     a {
@@ -75,10 +75,10 @@
 
     main {
       margin-top: 16px;
-      background: linear-gradient(180deg, rgba(28, 17, 10, 0.92), rgba(18, 11, 7, 0.9));
-      border: 1px solid rgba(255, 143, 61, 0.16);
+      background: linear-gradient(180deg, rgba(23, 6, 9, 0.94), rgba(12, 2, 4, 0.9));
+      border: 1px solid rgba(255, 78, 102, 0.14);
       border-radius: 28px;
-      box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28);
+      box-shadow: 0 22px 54px rgba(0, 0, 0, 0.32);
     }
 
     .container {
@@ -93,8 +93,8 @@
       top: 14px;
       z-index: 20;
       backdrop-filter: blur(16px);
-      background: rgba(24, 15, 10, 0.82);
-      border: 1px solid rgba(255, 143, 61, 0.18);
+      background: rgba(22, 6, 9, 0.84);
+      border: 1px solid rgba(255, 78, 102, 0.18);
       border-radius: 22px;
     }
 
@@ -123,8 +123,8 @@
       position: relative;
       overflow: hidden;
       box-shadow:
-        0 24px 56px rgba(0, 0, 0, 0.24),
-        inset 0 1px 0 rgba(255, 194, 132, 0.12);
+        0 24px 56px rgba(0, 0, 0, 0.26),
+        inset 0 1px 0 rgba(255, 152, 168, 0.1);
     }
 
     .hero-card::after {
@@ -134,7 +134,7 @@
       width: 220px;
       height: 220px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 143, 61, 0.18), transparent 70%);
+      background: radial-gradient(circle, rgba(255, 78, 102, 0.18), transparent 70%);
       pointer-events: none;
     }
 
@@ -144,7 +144,7 @@
       gap: 8px;
       padding: 6px 12px;
       border-radius: 999px;
-      background: rgba(255, 143, 61, 0.14);
+      background: rgba(255, 78, 102, 0.12);
       color: var(--accent);
       font-size: 13px;
       letter-spacing: 0.08em;
@@ -186,15 +186,15 @@
     .card {
       padding: 24px;
       box-shadow:
-        0 20px 48px rgba(0, 0, 0, 0.22),
-        0 0 0 1px rgba(255, 143, 61, 0.06);
+        0 20px 48px rgba(0, 0, 0, 0.24),
+        0 0 0 1px rgba(255, 78, 102, 0.04);
     }
 
     .btn {
       appearance: none;
-      border: 1px solid rgba(255, 143, 61, 0.45);
-      background: rgba(255, 143, 61, 0.14);
-      color: #ffd8b5;
+      border: 1px solid rgba(255, 78, 102, 0.4);
+      background: rgba(255, 78, 102, 0.12);
+      color: #ffd6dc;
       padding: 10px 14px;
       border-radius: 12px;
       font-size: 14px;
@@ -205,14 +205,14 @@
 
     .btn:hover {
       transform: translateY(-1px);
-      border-color: rgba(255, 177, 95, 0.9);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
-      background: rgba(255, 143, 61, 0.22);
+      border-color: rgba(255, 123, 141, 0.92);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+      background: rgba(255, 78, 102, 0.2);
     }
 
     .btn.primary,
     .btn.search {
-      background: linear-gradient(135deg, #ff8f3d, #ffb15f);
+      background: linear-gradient(135deg, #ff4e66, #ff7b8d);
       color: var(--primary-contrast);
       border-color: transparent;
       font-weight: 700;
@@ -239,26 +239,26 @@
       width: 100%;
       padding: 12px 14px;
       border-radius: 14px;
-      border: 1px solid rgba(255, 143, 61, 0.2);
-      background: rgba(31, 19, 12, 0.98);
+      border: 1px solid rgba(255, 78, 102, 0.18);
+      background: rgba(27, 8, 11, 0.98);
       color: var(--text);
       font-size: 14px;
       outline: none;
-      box-shadow: inset 0 1px 0 rgba(255, 194, 132, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 152, 168, 0.06);
       transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
     }
 
     .input:focus,
     .textarea:focus,
     .select:focus {
-      border-color: rgba(255, 177, 95, 0.88);
-      box-shadow: 0 0 0 3px rgba(255, 143, 61, 0.16);
-      background: rgba(37, 22, 13, 0.98);
+      border-color: rgba(255, 123, 141, 0.88);
+      box-shadow: 0 0 0 3px rgba(255, 78, 102, 0.16);
+      background: rgba(32, 9, 13, 0.98);
     }
 
     .input::placeholder,
     .textarea::placeholder {
-      color: #a98b75;
+      color: #aa7a83;
     }
 
     .textarea {
@@ -275,11 +275,11 @@
       overflow-x: auto;
       margin-top: 16px;
       border-radius: 16px;
-      border: 1px solid rgba(255, 143, 61, 0.22);
-      background: linear-gradient(180deg, #25160d, #190f09);
+      border: 1px solid rgba(255, 78, 102, 0.2);
+      background: linear-gradient(180deg, #250a0f, #150507);
       box-shadow:
-        inset 0 1px 0 rgba(255, 194, 132, 0.08),
-        0 14px 30px rgba(0, 0, 0, 0.18);
+        inset 0 1px 0 rgba(255, 152, 168, 0.08),
+        0 14px 30px rgba(0, 0, 0, 0.2);
     }
 
     .table {
@@ -294,23 +294,23 @@
       text-align: left;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       vertical-align: top;
-      color: rgba(255, 230, 207, 0.92);
+      color: rgba(255, 231, 234, 0.94);
     }
 
     .table thead th {
-      color: #ffb15f;
+      color: #ff9faf;
       font-size: 13px;
       letter-spacing: 0.04em;
     }
 
     .code-link {
-      color: #ffb15f;
+      color: #ff8d9d;
       text-decoration: none;
       font-weight: 700;
     }
 
     .code-link:hover {
-      color: #ffd39b;
+      color: #ffc1ca;
       text-decoration: underline;
     }
 
@@ -327,8 +327,8 @@
       transform: translateX(-50%);
       padding: 12px 16px;
       border-radius: 999px;
-      background: rgba(30, 18, 11, 0.98);
-      border: 1px solid rgba(255, 143, 61, 0.5);
+      background: rgba(25, 6, 10, 0.98);
+      border: 1px solid rgba(255, 78, 102, 0.48);
       box-shadow: var(--shadow);
       opacity: 0;
       pointer-events: none;
@@ -375,12 +375,13 @@
   <header class="site-header">
     <div class="container header-inner">
       <div>
-        <div class="eyebrow module-reveal delay-1">Daily Contest</div>
-        <h1 class="site-title module-reveal delay-2">每日大赛</h1>
+        <div class="eyebrow module-reveal delay-1">Animate</div>
+        <h1 class="site-title module-reveal delay-2">ANIMATE 页面</h1>
       </div>
       <nav class="actions">
         <a class="btn module-reveal is-bounce delay-3" href="./index.html">返回航班页</a>
-        <button id="say-hello" class="btn primary module-reveal is-bounce delay-4">提示按钮</button>
+        <a class="btn module-reveal is-bounce delay-4" href="./mrds.html">每日大赛</a>
+        <button id="say-hello" class="btn primary module-reveal is-bounce delay-5">提示按钮</button>
       </nav>
     </div>
   </header>
@@ -389,30 +390,30 @@
     <section class="container grid">
       <section class="card module-reveal delay-5">
         <h2>输入文本</h2>
-        <p class="muted">每行一条，例如：12345/作品标题/作者名</p>
+        <p class="muted">每行一条，例如：ABP-123/作品标题/高能反转</p>
         <div class="row">
-          <textarea id="entry-input" class="textarea" placeholder="在这里输入多行：代码/内容/作者"></textarea>
+          <textarea id="entry-input" class="textarea" placeholder="在这里输入多行：代码/内容/看点"></textarea>
         </div>
         <div class="controls" style="margin-top: 12px;">
           <label for="sort-by" class="muted">排序方式</label>
           <select id="sort-by" class="select" style="max-width:220px">
-            <option value="actor">按作者名称</option>
+            <option value="highlight">按看点名称</option>
             <option value="code">按代码字母</option>
           </select>
         </div>
         <div class="controls" style="margin-top: 12px;">
           <label for="search-box" class="muted">搜索</label>
-          <input id="search-box" class="input search-input" placeholder="输入代码/内容/作者关键字">
+          <input id="search-box" class="input search-input" placeholder="输入代码/内容/看点关键字">
           <button id="search-btn" class="btn search">搜索</button>
           <button id="clear-search" class="btn">清除</button>
         </div>
         <div class="table-wrap">
-          <table class="table" aria-label="每日大赛条目列表">
+          <table class="table" aria-label="Animate 条目列表">
             <thead>
               <tr>
                 <th style="width:22%">代码</th>
                 <th>内容</th>
-                <th style="width:22%">作者</th>
+                <th style="width:22%">看点</th>
                 <th style="width:160px">操作</th>
               </tr>
             </thead>
@@ -432,9 +433,9 @@
 
   <script>
     const storageConfig = {
-      entriesKey: "entries-mrds-v1",
-      invalidKey: "entries-mrds-invalid-v1",
-      codeLinkBase: "https://www.mrds66.com/archives/"
+      entriesKey: "entries-animate-v1",
+      invalidKey: "entries-animate-invalid-v1",
+      codeLinkBase: "https://hanime1.me/watch?v="
     };
 
     const toast = document.getElementById("toast");
@@ -457,7 +458,7 @@
     }
 
     helloBtn.addEventListener("click", () => {
-      showToast("每日大赛页面已就绪");
+      showToast("Animate 页面已就绪");
     });
 
     function loadEntries() {
@@ -496,13 +497,13 @@
 
       const code = parts[0];
       const content = parts[1];
-      const actor = parts.slice(2).join("/");
+      const highlight = parts.slice(2).join("/");
 
-      if (!code || !actor) {
+      if (!code || !highlight) {
         return null;
       }
 
-      return { code, content, actor };
+      return { code, content, highlight };
     }
 
     function upsert(arr, entry) {
@@ -517,10 +518,10 @@
     function sortEntries(arr, by) {
       const collator = new Intl.Collator("zh-CN", { sensitivity: "base", numeric: true });
       const copy = arr.slice();
-      if (by === "actor") {
-        copy.sort((a, b) => collator.compare(a.actor, b.actor) || collator.compare(a.code, b.code));
+      if (by === "highlight") {
+        copy.sort((a, b) => collator.compare(a.highlight, b.highlight) || collator.compare(a.code, b.code));
       } else {
-        copy.sort((a, b) => collator.compare(a.code, b.code) || collator.compare(a.actor, b.actor));
+        copy.sort((a, b) => collator.compare(a.code, b.code) || collator.compare(a.highlight, b.highlight));
       }
       return copy;
     }
@@ -544,7 +545,7 @@
         data = data.filter((item) =>
           (item.code && item.code.toLowerCase().includes(q)) ||
           (item.content && item.content.toLowerCase().includes(q)) ||
-          (item.actor && item.actor.toLowerCase().includes(q))
+          (item.highlight && item.highlight.toLowerCase().includes(q))
         );
       }
 
@@ -556,12 +557,12 @@
 
         const tdCode = document.createElement("td");
         const tdContent = document.createElement("td");
-        const tdActor = document.createElement("td");
+        const tdHighlight = document.createElement("td");
         const tdActions = document.createElement("td");
 
         tdCode.appendChild(createCodeLink(item.code));
         tdContent.textContent = item.content || "";
-        tdActor.textContent = item.actor || "";
+        tdHighlight.textContent = item.highlight || "";
 
         const editBtn = document.createElement("button");
         editBtn.className = "btn sm";
@@ -579,7 +580,7 @@
 
         tr.appendChild(tdCode);
         tr.appendChild(tdContent);
-        tr.appendChild(tdActor);
+        tr.appendChild(tdHighlight);
         tr.appendChild(tdActions);
         tbody.appendChild(tr);
       }
@@ -688,7 +689,7 @@
 
       const tdCode = document.createElement("td");
       const tdContent = document.createElement("td");
-      const tdActor = document.createElement("td");
+      const tdHighlight = document.createElement("td");
       const tdActions = document.createElement("td");
 
       const inputCode = document.createElement("input");
@@ -699,13 +700,13 @@
       inputContent.className = "input";
       inputContent.value = item.content || "";
 
-      const inputActor = document.createElement("input");
-      inputActor.className = "input";
-      inputActor.value = item.actor || "";
+      const inputHighlight = document.createElement("input");
+      inputHighlight.className = "input";
+      inputHighlight.value = item.highlight || "";
 
       tdCode.appendChild(inputCode);
       tdContent.appendChild(inputContent);
-      tdActor.appendChild(inputActor);
+      tdHighlight.appendChild(inputHighlight);
 
       const saveBtn = document.createElement("button");
       saveBtn.className = "btn sm";
@@ -713,10 +714,10 @@
       saveBtn.addEventListener("click", () => {
         const newCode = inputCode.value.trim();
         const newContent = inputContent.value.trim();
-        const newActor = inputActor.value.trim();
+        const newHighlight = inputHighlight.value.trim();
 
-        if (!newCode || !newActor) {
-          showToast("代码与作者不能为空");
+        if (!newCode || !newHighlight) {
+          showToast("代码与看点不能为空");
           return;
         }
 
@@ -732,7 +733,7 @@
 
         const index = latestEntries.findIndex((entry) => entry.code.toLowerCase() === item.code.toLowerCase());
         if (index >= 0) {
-          latestEntries.splice(index, 1, { code: newCode, content: newContent, actor: newActor });
+          latestEntries.splice(index, 1, { code: newCode, content: newContent, highlight: newHighlight });
         }
 
         saveEntries(latestEntries);
@@ -751,7 +752,7 @@
 
       tr.appendChild(tdCode);
       tr.appendChild(tdContent);
-      tr.appendChild(tdActor);
+      tr.appendChild(tdHighlight);
       tr.appendChild(tdActions);
     }
 

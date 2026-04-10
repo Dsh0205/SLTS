@@ -83,21 +83,27 @@ function createWindowsManager({
       return floatingNotesWindow
     }
 
+    const parentWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
+
     floatingNotesWindow = new BrowserWindow({
+      parent: parentWindow ?? undefined,
       width: 430,
       height: 760,
       minWidth: 360,
       minHeight: 520,
       maxWidth: 520,
+      show: false,
       frame: false,
-      transparent: true,
+      // Electron 官方文档提到透明窗口不支持稳定缩放，
+      // `transparent: true` 与 `resizable: true` 的组合在部分平台会导致窗口无法正常显示。
+      transparent: false,
       hasShadow: true,
       resizable: true,
       movable: true,
       maximizable: false,
       fullscreenable: false,
       autoHideMenuBar: true,
-      backgroundColor: '#00000000',
+      backgroundColor: '#f7f1ff',
       title: '悬浮笔记窗',
       icon: iconPath,
       alwaysOnTop: floatingNotesPinned,
@@ -119,6 +125,23 @@ function createWindowsManager({
       devServerUrl,
       relativePath: 'modules/notes/floating.html',
       query: { noteId: noteId ?? '' },
+    })
+
+    floatingNotesWindow.once('ready-to-show', () => {
+      if (!floatingNotesWindow || floatingNotesWindow.isDestroyed()) {
+        return
+      }
+
+      floatingNotesWindow.show()
+      floatingNotesWindow.focus()
+    })
+
+    floatingNotesWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      console.error('Failed to load floating notes window.', {
+        errorCode,
+        errorDescription,
+        validatedURL,
+      })
     })
 
     floatingNotesWindow.on('closed', () => {

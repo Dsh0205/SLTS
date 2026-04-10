@@ -8,14 +8,14 @@
   <link rel="stylesheet" href="../shared/reveal.css">
   <style>
     :root {
-      --bg: #fff2f4;
+      --bg: #ff6a78;
       --text: #0f1216;
-      --muted: #7f5c64;
+      --muted: #6a2230;
       --card: rgba(255, 255, 255, 0.88);
-      --border: rgba(255, 106, 120, 0.16);
+      --border: rgba(255, 255, 255, 0.3);
       --primary: #ff6a78;
       --primary-contrast: #ffffff;
-      --accent: #ff9aa6;
+      --accent: #ffd2d7;
     }
 
     .dark {
@@ -81,7 +81,7 @@
     .site-header {
       position: sticky;
       top: 0;
-      background: rgba(255, 242, 244, 0.86);
+      background: var(--bg);
       border-bottom: 1px solid var(--border);
       z-index: 10;
       backdrop-filter: blur(12px);
@@ -285,23 +285,14 @@
         <button id="say-hello" class="btn module-reveal is-bounce delay-4">功能按钮</button>
         <a class="btn module-reveal is-bounce delay-5" href="../comic/index.html">漫画按钮</a>
         <a class="btn module-reveal is-bounce delay-6" href="./mrds.html">每日大赛按钮</a>
+        <a class="btn module-reveal is-bounce delay-7" href="./animate.html">Animate 按钮</a>
       </nav>
     </div>
   </header>
 
   <main class="module-pop-surface delay-1">
     <div class="container">
-      <section class="card module-reveal delay-4">
-        <h2>开始使用</h2>
-        <p>每行输入一条数据，格式为“代码/内容/作者”，按回车或离开输入框后自动保存并显示在下面。</p>
-        <ul class="list">
-          <li>支持搜索、排序、编辑、删除</li>
-          <li>代码列会自动生成跳转链接</li>
-          <li>无法识别的文本会单独列在下方</li>
-        </ul>
-      </section>
-
-      <section class="card module-reveal delay-5" style="margin-top:16px">
+      <section class="card module-reveal delay-5">
         <h2>输入文本</h2>
         <p class="muted">每行使用“代码/内容/作者”格式，例如：CA123/上海到北京/张三</p>
         <div class="row">
