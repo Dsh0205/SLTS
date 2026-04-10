@@ -70,6 +70,31 @@
     </section>
   </main>
 
+  <dialog id="anchorNameDialog" class="anchor-name-dialog" aria-labelledby="anchorNameTitle">
+    <form class="anchor-name-form" method="dialog">
+      <div class="anchor-name-copy">
+        <h2 id="anchorNameTitle">创建摄影展示页</h2>
+        <p>给当前锚点起个名字，稍后还可以继续往里面添加照片和相册。</p>
+      </div>
+      <label class="anchor-name-field" for="anchorNameInput">
+        <span>展示页名称</span>
+        <input
+          id="anchorNameInput"
+          class="anchor-name-input"
+          name="anchorName"
+          type="text"
+          maxlength="32"
+          autocomplete="off"
+          spellcheck="false"
+        >
+      </label>
+      <menu class="anchor-name-actions">
+        <button class="anchor-name-btn anchor-name-btn--ghost" type="submit" value="cancel">取消</button>
+        <button class="anchor-name-btn" type="submit" value="confirm">创建锚点</button>
+      </menu>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <script type="module" src="./app.js"></script>

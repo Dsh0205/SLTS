@@ -40,6 +40,8 @@ const provinceFocusMap = document.getElementById("provinceFocusMap");
 const focusProvinceLayer = document.getElementById("focusProvinceLayer");
 const focusAnchorLayer = document.getElementById("focusAnchorLayer");
 const focusLabelLayer = document.getElementById("focusLabelLayer");
+const anchorNameDialog = document.getElementById("anchorNameDialog");
+const anchorNameInput = document.getElementById("anchorNameInput");
 
 let provinces = [];
 let provinceById = new Map();
@@ -51,6 +53,7 @@ let focusProvinceId = null;
 let focusTransform = null;
 let toastTimer = 0;
 let lastAnchorAnimationKey = "";
+let focusAnchorPromptPending = false;
 
 bindEvents();
 bootstrap();
@@ -61,9 +64,10 @@ function bindEvents() {
   provinceFocusBackdrop?.addEventListener("click", (event) => {
     if (event.target === provinceFocusBackdrop) closeProvinceFocus();
   });
+  provinceFocusMap?.addEventListener("pointerdown", handleFocusPointerDown);
   provinceFocusMap?.addEventListener("contextmenu", handleFocusContextMenu);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && focusProvinceId) closeProvinceFocus();
+    if (event.key === "Escape" && focusProvinceId && !anchorNameDialog?.open) closeProvinceFocus();
   });
   window.addEventListener("storage", handleStorageSync);
   desktopBridge?.onMirroredStorageChanged?.((moduleId) => {
@@ -656,8 +660,18 @@ function createAnchorVisual(labelText, options) {
   return visual;
 }
 
+function handleFocusPointerDown(event) {
+  if (event.button !== 2) return;
+  createFocusAnchorFromEvent(event);
+}
+
 function handleFocusContextMenu(event) {
+  createFocusAnchorFromEvent(event);
+}
+
+async function createFocusAnchorFromEvent(event) {
   event.preventDefault();
+  if (focusAnchorPromptPending) return;
   if (!(event.target instanceof Element) || !focusProvinceId || !focusTransform) return;
   if (event.target.closest("[data-anchor-id]")) return;
   if (!event.target.closest(".focus-province-hitarea, .focus-province-path, .focus-province-outline")) return;
@@ -671,26 +685,78 @@ function handleFocusContextMenu(event) {
     y: (focusPoint.y - focusTransform.translateY) / focusTransform.scale,
   };
   const defaultName = createAnchorName(province.name);
-  const customName = window.prompt("请输入这个摄影展示页的名称：", defaultName);
-  if (customName === null) return;
+  focusAnchorPromptPending = true;
+  try {
+    const customName = await requestAnchorName(defaultName);
+    if (customName === null) return;
 
-  state.anchors.push({
-    id: createId("anchor"),
-    name: customName.trim().slice(0, 32) || defaultName,
-    provinceId: province.id,
-    provinceName: province.name,
-    x: clampNumber(mapPoint.x, 20, MAP_WIDTH - 20, province.centerPoint.x),
-    y: clampNumber(mapPoint.y, 20, MAP_HEIGHT - 20, province.centerPoint.y),
-    createdAt: new Date().toISOString(),
-    activeAlbumId: null,
-    albums: [],
-  });
-  state.activeAnchorId = state.anchors.at(-1)?.id || null;
-  selectedProvinceId = province.id;
-  if (saveState()) {
-    render();
-    showToast(TEXT.addAnchor);
+    state.anchors.push({
+      id: createId("anchor"),
+      name: customName.trim().slice(0, 32) || defaultName,
+      provinceId: province.id,
+      provinceName: province.name,
+      x: clampNumber(mapPoint.x, 20, MAP_WIDTH - 20, province.centerPoint.x),
+      y: clampNumber(mapPoint.y, 20, MAP_HEIGHT - 20, province.centerPoint.y),
+      createdAt: new Date().toISOString(),
+      activeAlbumId: null,
+      albums: [],
+    });
+    state.activeAnchorId = state.anchors.at(-1)?.id || null;
+    selectedProvinceId = province.id;
+    if (saveState()) {
+      render();
+      showToast(TEXT.addAnchor);
+    }
+  } finally {
+    focusAnchorPromptPending = false;
   }
+}
+
+function requestAnchorName(defaultName) {
+  if (desktopBridge?.isElectron || typeof window.prompt !== "function") {
+    return requestAnchorNameWithDialog(defaultName);
+  }
+
+  return Promise.resolve(window.prompt("请输入这个摄影展示页的名称：", defaultName));
+}
+
+function requestAnchorNameWithDialog(defaultName) {
+  if (!(anchorNameDialog instanceof HTMLDialogElement) || !(anchorNameInput instanceof HTMLInputElement)) {
+    return Promise.resolve(
+      typeof window.prompt === "function"
+        ? window.prompt("请输入这个摄影展示页的名称：", defaultName)
+        : defaultName,
+    );
+  }
+
+  if (anchorNameDialog.open) {
+    anchorNameDialog.close("cancel");
+  }
+
+  anchorNameInput.value = defaultName;
+
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      resolve(anchorNameDialog.returnValue === "confirm" ? anchorNameInput.value : null);
+    };
+
+    anchorNameDialog.addEventListener("close", handleClose, { once: true });
+
+    try {
+      anchorNameDialog.showModal();
+      window.requestAnimationFrame(() => {
+        anchorNameInput.focus();
+        anchorNameInput.select();
+      });
+    } catch {
+      anchorNameDialog.removeEventListener("close", handleClose);
+      resolve(
+        typeof window.prompt === "function"
+          ? window.prompt("请输入这个摄影展示页的名称：", defaultName)
+          : defaultName,
+      );
+    }
+  });
 }
 
 function toSvgPoint(svg, clientX, clientY) {
@@ -708,6 +774,9 @@ function openGalleryForAnchor(anchorId) {
 }
 
 function closeProvinceFocus() {
+  if (anchorNameDialog?.open) {
+    anchorNameDialog.close("cancel");
+  }
   focusProvinceId = null;
   renderFocusOverlay();
 }
