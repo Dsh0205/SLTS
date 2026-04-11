@@ -208,6 +208,39 @@ body[data-page="map"] .map-stage {
   font-size: 0.92rem;
 }
 
+.province-focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.province-focus-btn {
+  border: 1px solid rgba(151, 227, 185, 0.24);
+  border-radius: 999px;
+  background: rgba(7, 24, 15, 0.72);
+  color: #f3fff7;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(3, 20, 12, 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.province-focus-btn:hover,
+.province-focus-btn:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(170, 245, 203, 0.4);
+  background: rgba(10, 31, 20, 0.82);
+  box-shadow: 0 16px 28px rgba(3, 20, 12, 0.22);
+}
+
+.province-focus-btn.is-active {
+  border-color: rgba(117, 223, 164, 0.56);
+  background: linear-gradient(180deg, rgba(100, 219, 147, 0.96), rgba(43, 156, 88, 0.96));
+  color: #072111;
+}
+
 .province-focus-stage {
   position: relative;
   width: 100%;
@@ -221,6 +254,13 @@ body[data-page="map"] .map-stage {
   width: min(100%, 980px);
   height: auto;
   overflow: visible;
+}
+
+.province-focus-map.is-anchor-placement,
+.province-focus-map.is-anchor-placement .focus-province-path,
+.province-focus-map.is-anchor-placement .focus-province-outline,
+.province-focus-map.is-anchor-placement .focus-province-hitarea {
+  cursor: crosshair;
 }
 
 .map-stage::before {

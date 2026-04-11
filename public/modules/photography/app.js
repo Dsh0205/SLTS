@@ -25,6 +25,11 @@ const TEXT = {
   focusHint: "点击省份后会单独放大，右键省份内部即可创建摄影展示页。",
   focusSubtitle: "右键省份内部任意位置，可创建摄影锚点",
 };
+const FOCUS_HINT_TEXT = "点击“创建锚点”后，再点击放大的省份地图即可放置新锚点。";
+const FOCUS_PLACEMENT_HINT_TEXT = "已进入放置模式，请在放大地图中点击要创建锚点的位置。";
+const FOCUS_SUBTITLE_TEXT = "点击已有锚点可直接进入相册页面";
+const FOCUS_PLACEMENT_READY_TEXT = "已进入创建模式，请在放大地图中点击位置";
+const FOCUS_PLACEMENT_CANCELED_TEXT = "已取消锚点放置";
 const desktopBridge = window.shanlicDesktop || null;
 
 const chinaMap = document.getElementById("chinaMap");
@@ -36,6 +41,7 @@ const provinceFocusBackdrop = document.getElementById("provinceFocusBackdrop");
 const closeProvinceFocusBtn = document.getElementById("closeProvinceFocusBtn");
 const focusProvinceName = document.getElementById("focusProvinceName");
 const focusProvinceHint = document.getElementById("focusProvinceHint");
+const focusCreateAnchorBtn = document.getElementById("focusCreateAnchorBtn");
 const provinceFocusMap = document.getElementById("provinceFocusMap");
 const focusProvinceLayer = document.getElementById("focusProvinceLayer");
 const focusAnchorLayer = document.getElementById("focusAnchorLayer");
@@ -54,17 +60,21 @@ let focusTransform = null;
 let toastTimer = 0;
 let lastAnchorAnimationKey = "";
 let focusAnchorPromptPending = false;
+let isFocusAnchorPlacementMode = false;
 
 bindEvents();
 bootstrap();
 
 function bindEvents() {
-  chinaMap?.addEventListener("contextmenu", (event) => event.preventDefault());
+  chinaMap?.addEventListener("pointerdown", handleChinaMapPointerDown);
+  chinaMap?.addEventListener("contextmenu", handleChinaMapContextMenu);
   closeProvinceFocusBtn?.addEventListener("click", closeProvinceFocus);
+  focusCreateAnchorBtn?.addEventListener("click", handleFocusCreateAnchorButtonClick);
   provinceFocusBackdrop?.addEventListener("click", (event) => {
     if (event.target === provinceFocusBackdrop) closeProvinceFocus();
   });
   provinceFocusMap?.addEventListener("pointerdown", handleFocusPointerDown);
+  provinceFocusMap?.addEventListener("click", handleFocusMapClick);
   provinceFocusMap?.addEventListener("contextmenu", handleFocusContextMenu);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && focusProvinceId && !anchorNameDialog?.open) closeProvinceFocus();
@@ -458,7 +468,39 @@ function render() {
 function openProvinceFocus(provinceId) {
   selectedProvinceId = provinceId;
   focusProvinceId = provinceId;
+  setFocusAnchorPlacementMode(false);
   render();
+}
+
+function handleFocusCreateAnchorButtonClick() {
+  if (!focusProvinceId) return;
+  const nextState = !isFocusAnchorPlacementMode;
+  setFocusAnchorPlacementMode(nextState);
+  showToast(nextState ? FOCUS_PLACEMENT_READY_TEXT : FOCUS_PLACEMENT_CANCELED_TEXT);
+}
+
+function handleFocusMapClick(event) {
+  if (!isFocusAnchorPlacementMode) return;
+  if (!(event.target instanceof Element) || event.target.closest("[data-anchor-id]")) return;
+  void createAnchorFromFocusMapClick(event);
+}
+
+function setFocusAnchorPlacementMode(enabled) {
+  isFocusAnchorPlacementMode = Boolean(enabled) && Boolean(focusProvinceId);
+  syncFocusAnchorPlacementUi();
+}
+
+function syncFocusAnchorPlacementUi() {
+  if (focusProvinceHint) {
+    focusProvinceHint.textContent = isFocusAnchorPlacementMode ? FOCUS_PLACEMENT_HINT_TEXT : FOCUS_HINT_TEXT;
+  }
+
+  if (focusCreateAnchorBtn) {
+    focusCreateAnchorBtn.classList.toggle("is-active", isFocusAnchorPlacementMode);
+    focusCreateAnchorBtn.textContent = isFocusAnchorPlacementMode ? "取消放置" : "创建锚点";
+  }
+
+  provinceFocusMap?.classList.toggle("is-anchor-placement", isFocusAnchorPlacementMode);
 }
 
 function renderProvinceSelection() {
@@ -528,13 +570,15 @@ function renderFocusOverlay() {
     focusAnchorLayer?.replaceChildren();
     focusLabelLayer?.replaceChildren();
     focusTransform = null;
+    isFocusAnchorPlacementMode = false;
+    syncFocusAnchorPlacementUi();
     return;
   }
 
   provinceFocusBackdrop.hidden = false;
   focusProvinceName.textContent = `${province.name} 摄影模块`;
-  focusProvinceHint.textContent = TEXT.focusHint;
   focusTransform = createFocusTransform(province.bounds);
+  syncFocusAnchorPlacementUi();
   renderFocusProvince(province);
   renderFocusAnchors(province);
 }
@@ -597,7 +641,7 @@ function renderFocusProvince(province) {
   subtitle.setAttribute("class", "focus-label-sub");
   subtitle.setAttribute("x", String(center.x));
   subtitle.setAttribute("y", String(center.y + 28));
-  subtitle.textContent = TEXT.focusSubtitle;
+  subtitle.textContent = FOCUS_SUBTITLE_TEXT;
   focusLabelLayer.append(title, subtitle);
 }
 
@@ -660,6 +704,15 @@ function createAnchorVisual(labelText, options) {
   return visual;
 }
 
+function handleChinaMapPointerDown(event) {
+  if (event.button !== 2) return;
+  createAnchorFromMainMapEvent(event);
+}
+
+function handleChinaMapContextMenu(event) {
+  createAnchorFromMainMapEvent(event);
+}
+
 function handleFocusPointerDown(event) {
   if (event.button !== 2) return;
   createFocusAnchorFromEvent(event);
@@ -674,7 +727,6 @@ async function createFocusAnchorFromEvent(event) {
   if (focusAnchorPromptPending) return;
   if (!(event.target instanceof Element) || !focusProvinceId || !focusTransform) return;
   if (event.target.closest("[data-anchor-id]")) return;
-  if (!event.target.closest(".focus-province-hitarea, .focus-province-path, .focus-province-outline")) return;
 
   const province = provinceById.get(focusProvinceId);
   if (!province) return;
@@ -684,32 +736,86 @@ async function createFocusAnchorFromEvent(event) {
     x: (focusPoint.x - focusTransform.translateX) / focusTransform.scale,
     y: (focusPoint.y - focusTransform.translateY) / focusTransform.scale,
   };
+  await createAnchorForProvince(province, mapPoint, { openFocus: true });
+}
+
+async function createAnchorFromFocusMapClick(event) {
+  if (!focusProvinceId || !focusTransform) return;
+
+  const province = provinceById.get(focusProvinceId);
+  if (!province) return;
+
+  const focusPoint = toSvgPoint(provinceFocusMap, event.clientX, event.clientY);
+  const mapPoint = {
+    x: (focusPoint.x - focusTransform.translateX) / focusTransform.scale,
+    y: (focusPoint.y - focusTransform.translateY) / focusTransform.scale,
+  };
+  const created = await createAnchorForProvince(province, mapPoint, {
+    openFocus: true,
+  });
+
+  if (created) {
+    setFocusAnchorPlacementMode(false);
+  }
+}
+
+async function createAnchorFromMainMapEvent(event) {
+  event.preventDefault();
+  if (focusAnchorPromptPending) return;
+  if (!(event.target instanceof Element) || event.target.closest("[data-anchor-id]")) return;
+
+  const provinceId = event.target.closest("[data-province-id]")?.dataset?.provinceId;
+  if (!provinceId) return;
+
+  const province = provinceById.get(provinceId);
+  if (!province) return;
+
+  const mapPoint = toSvgPoint(chinaMap, event.clientX, event.clientY);
+  await createAnchorForProvince(province, mapPoint, { openFocus: true });
+}
+
+async function createAnchorForProvince(province, mapPoint, options = {}) {
+  if (!province || !mapPoint) return false;
+
   const defaultName = createAnchorName(province.name);
+  const boundedPoint = clampAnchorPointToProvince(province, mapPoint);
   focusAnchorPromptPending = true;
   try {
-    const customName = await requestAnchorName(defaultName);
-    if (customName === null) return;
+    const customName = options.requestName === false
+      ? defaultName
+      : await requestAnchorName(defaultName);
+    if (customName === null) return false;
 
     state.anchors.push({
       id: createId("anchor"),
       name: customName.trim().slice(0, 32) || defaultName,
       provinceId: province.id,
       provinceName: province.name,
-      x: clampNumber(mapPoint.x, 20, MAP_WIDTH - 20, province.centerPoint.x),
-      y: clampNumber(mapPoint.y, 20, MAP_HEIGHT - 20, province.centerPoint.y),
+      x: boundedPoint.x,
+      y: boundedPoint.y,
       createdAt: new Date().toISOString(),
       activeAlbumId: null,
       albums: [],
     });
     state.activeAnchorId = state.anchors.at(-1)?.id || null;
     selectedProvinceId = province.id;
-    if (saveState()) {
+    focusProvinceId = options.openFocus ? province.id : focusProvinceId;
+    const saved = saveState();
+    if (saved) {
       render();
       showToast(TEXT.addAnchor);
     }
+    return saved;
   } finally {
     focusAnchorPromptPending = false;
   }
+}
+
+function clampAnchorPointToProvince(province, point) {
+  return {
+    x: clampNumber(point.x, province.bounds.minX, province.bounds.maxX, province.centerPoint.x),
+    y: clampNumber(point.y, province.bounds.minY, province.bounds.maxY, province.centerPoint.y),
+  };
 }
 
 function requestAnchorName(defaultName) {
@@ -778,6 +884,7 @@ function closeProvinceFocus() {
     anchorNameDialog.close("cancel");
   }
   focusProvinceId = null;
+  setFocusAnchorPlacementMode(false);
   renderFocusOverlay();
 }
 
