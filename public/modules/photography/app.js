@@ -22,12 +22,12 @@ const TEXT = {
   addAnchor: "已创建新的摄影展示页",
   saveError: "保存失败，请稍后再试",
   mapLoadError: "地图数据加载失败，请刷新页面后重试",
-  focusHint: "点击省份后会单独放大，右键省份内部即可创建摄影展示页。",
-  focusSubtitle: "右键省份内部任意位置，可创建摄影锚点",
+  focusHint: "点击放大的省份地图即可创建锚点，也可以先点“创建锚点”再放置。",
+  focusSubtitle: "点击省份空白区域创建锚点，点击已有锚点进入相册页面",
 };
-const FOCUS_HINT_TEXT = "点击“创建锚点”后，再点击放大的省份地图即可放置新锚点。";
+const FOCUS_HINT_TEXT = "点击放大的省份地图即可创建锚点，也可以先点“创建锚点”再放置。";
 const FOCUS_PLACEMENT_HINT_TEXT = "已进入放置模式，请在放大地图中点击要创建锚点的位置。";
-const FOCUS_SUBTITLE_TEXT = "点击已有锚点可直接进入相册页面";
+const FOCUS_SUBTITLE_TEXT = "点击省份空白区域创建锚点，点击已有锚点进入相册页面";
 const FOCUS_PLACEMENT_READY_TEXT = "已进入创建模式，请在放大地图中点击位置";
 const FOCUS_PLACEMENT_CANCELED_TEXT = "已取消锚点放置";
 const desktopBridge = window.shanlicDesktop || null;
@@ -480,9 +480,14 @@ function handleFocusCreateAnchorButtonClick() {
 }
 
 function handleFocusMapClick(event) {
-  if (!isFocusAnchorPlacementMode) return;
   if (!(event.target instanceof Element) || event.target.closest("[data-anchor-id]")) return;
+  if (!isFocusAnchorPlacementMode && !isFocusProvincePlacementTarget(event.target)) return;
   void createAnchorFromFocusMapClick(event);
+}
+
+function isFocusProvincePlacementTarget(target) {
+  return target instanceof Element
+    && Boolean(target.closest(".focus-province-hitarea, .focus-province-path, .focus-province-outline"));
 }
 
 function setFocusAnchorPlacementMode(enabled) {
@@ -727,6 +732,7 @@ async function createFocusAnchorFromEvent(event) {
   if (focusAnchorPromptPending) return;
   if (!(event.target instanceof Element) || !focusProvinceId || !focusTransform) return;
   if (event.target.closest("[data-anchor-id]")) return;
+  if (!isFocusProvincePlacementTarget(event.target)) return;
 
   const province = provinceById.get(focusProvinceId);
   if (!province) return;
