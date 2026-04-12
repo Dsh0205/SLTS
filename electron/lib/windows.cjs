@@ -33,12 +33,24 @@ function createWindowsManager({
     })
 
     registerExternalLinkPolicy(mainWindow, shell)
-    loadRendererPage({
+    void loadRendererPage({
       browserWindow: mainWindow,
       app,
       rootDir,
       devServerUrl,
       relativePath: 'index.html',
+    })
+
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      console.error('Failed to load main window.', {
+        errorCode,
+        errorDescription,
+        validatedURL,
+      })
+    })
+
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      console.error('Main window render process exited.', details)
     })
 
     mainWindow.on('page-title-updated', (event) => {
@@ -118,7 +130,7 @@ function createWindowsManager({
 
     applyFloatingNotesAlwaysOnTop(floatingNotesPinned)
     registerExternalLinkPolicy(floatingNotesWindow, shell)
-    loadRendererPage({
+    void loadRendererPage({
       browserWindow: floatingNotesWindow,
       app,
       rootDir,

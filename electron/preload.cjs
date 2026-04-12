@@ -165,6 +165,9 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   savePhotographyPhoto(payload) {
     return ipcRenderer.invoke('desktop-photography:save-photo', payload)
   },
+  pickPhotographyPhotos() {
+    return ipcRenderer.invoke('desktop-photography:pick-photos')
+  },
   deletePhotographyPhoto(filePath) {
     return ipcRenderer.invoke('desktop-photography:delete-photo', filePath)
   },

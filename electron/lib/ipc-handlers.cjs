@@ -241,6 +241,36 @@ function registerDesktopIpcHandlers({
     }
   })
 
+  ipcMain.handle('desktop-photography:pick-photos', async (event) => {
+    if (!photographyAssets) {
+      return {
+        canceled: true,
+        photos: [],
+      }
+    }
+
+    const browserWindow = BrowserWindow.fromWebContents(event.sender)
+    const result = await dialog.showOpenDialog(browserWindow, {
+      title: '选择摄影照片',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'] },
+      ],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return {
+        canceled: true,
+        photos: [],
+      }
+    }
+
+    return {
+      canceled: false,
+      photos: result.filePaths.map((filePath) => photographyAssets.importPhotoFromPath(filePath)),
+    }
+  })
+
   ipcMain.handle('desktop-photography:delete-photo', async (_event, filePath) => {
     if (!photographyAssets) {
       return { deleted: false }

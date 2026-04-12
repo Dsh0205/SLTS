@@ -241,6 +241,11 @@ body[data-page="map"] .map-stage {
   color: #072111;
 }
 
+.province-focus-btn--secondary {
+  background: rgba(7, 24, 15, 0.62);
+  color: #f3fff7;
+}
+
 .province-focus-stage {
   position: relative;
   width: 100%;
@@ -695,14 +700,37 @@ body[data-page="map"] .focus-province-outline {
   width: 56px;
   height: 56px;
   border: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border-radius: 20px;
   background: linear-gradient(180deg, #9af3c1, #27b06e);
-  color: #ffffff;
-  font-size: 2rem;
-  line-height: 1;
   cursor: pointer;
   box-shadow: 0 16px 32px rgba(39, 176, 110, 0.26);
   transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.gallery-plus-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 6px 10px rgba(24, 69, 45, 0.16));
+}
+
+.gallery-plus-close {
+  display: none;
+  color: #ffffff;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.gallery-plus-btn.is-open .gallery-plus-icon {
+  display: none;
+}
+
+.gallery-plus-btn.is-open .gallery-plus-close {
+  display: block;
 }
 
 .gallery-plus-btn:hover {

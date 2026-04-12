@@ -41,6 +41,7 @@ const provinceFocusBackdrop = document.getElementById("provinceFocusBackdrop");
 const closeProvinceFocusBtn = document.getElementById("closeProvinceFocusBtn");
 const focusProvinceName = document.getElementById("focusProvinceName");
 const focusProvinceHint = document.getElementById("focusProvinceHint");
+const focusEnterGalleryBtn = document.getElementById("focusEnterGalleryBtn");
 const focusCreateAnchorBtn = document.getElementById("focusCreateAnchorBtn");
 const provinceFocusMap = document.getElementById("provinceFocusMap");
 const focusProvinceLayer = document.getElementById("focusProvinceLayer");
@@ -61,6 +62,7 @@ let toastTimer = 0;
 let lastAnchorAnimationKey = "";
 let focusAnchorPromptPending = false;
 let isFocusAnchorPlacementMode = false;
+let suppressNextFocusMapClick = false;
 
 bindEvents();
 bootstrap();
@@ -69,6 +71,7 @@ function bindEvents() {
   chinaMap?.addEventListener("pointerdown", handleChinaMapPointerDown);
   chinaMap?.addEventListener("contextmenu", handleChinaMapContextMenu);
   closeProvinceFocusBtn?.addEventListener("click", closeProvinceFocus);
+  focusEnterGalleryBtn?.addEventListener("click", handleFocusEnterGalleryButtonClick);
   focusCreateAnchorBtn?.addEventListener("click", handleFocusCreateAnchorButtonClick);
   provinceFocusBackdrop?.addEventListener("click", (event) => {
     if (event.target === provinceFocusBackdrop) closeProvinceFocus();
@@ -472,6 +475,36 @@ function openProvinceFocus(provinceId) {
   render();
 }
 
+function openOrCreateGalleryForProvince(provinceId) {
+  const province = provinceById.get(provinceId);
+  if (!province) return false;
+
+  selectedProvinceId = provinceId;
+
+  const existingAnchor = findPreferredAnchorForProvince(provinceId);
+  if (existingAnchor) {
+    openGalleryForAnchor(existingAnchor.id);
+    return true;
+  }
+
+  void createAnchorForProvince(province, province.centerPoint, {
+    requestName: false,
+    navigateToGallery: true,
+  });
+  return true;
+}
+
+function findPreferredAnchorForProvince(provinceId) {
+  if (!provinceId) return null;
+
+  const activeAnchor = state.anchors.find((anchor) => anchor.id === state.activeAnchorId);
+  if (activeAnchor?.provinceId === provinceId) {
+    return activeAnchor;
+  }
+
+  return state.anchors.find((anchor) => anchor.provinceId === provinceId) || null;
+}
+
 function handleFocusCreateAnchorButtonClick() {
   if (!focusProvinceId) return;
   const nextState = !isFocusAnchorPlacementMode;
@@ -479,15 +512,32 @@ function handleFocusCreateAnchorButtonClick() {
   showToast(nextState ? FOCUS_PLACEMENT_READY_TEXT : FOCUS_PLACEMENT_CANCELED_TEXT);
 }
 
+function handleFocusEnterGalleryButtonClick() {
+  if (!focusProvinceId) return;
+  setFocusAnchorPlacementMode(false);
+  openOrCreateGalleryForProvince(focusProvinceId);
+}
+
 function handleFocusMapClick(event) {
+  if (suppressNextFocusMapClick) {
+    suppressNextFocusMapClick = false;
+    return;
+  }
   if (!(event.target instanceof Element) || event.target.closest("[data-anchor-id]")) return;
-  if (!isFocusAnchorPlacementMode && !isFocusProvincePlacementTarget(event.target)) return;
-  void createAnchorFromFocusMapClick(event);
+  if (isFocusAnchorPlacementMode) {
+    return;
+  }
+
+  openOrCreateGalleryForProvince(focusProvinceId);
 }
 
 function isFocusProvincePlacementTarget(target) {
   return target instanceof Element
     && Boolean(target.closest(".focus-province-hitarea, .focus-province-path, .focus-province-outline"));
+}
+
+function canCreateFocusAnchorFromTarget(target) {
+  return isFocusAnchorPlacementMode || isFocusProvincePlacementTarget(target);
 }
 
 function setFocusAnchorPlacementMode(enabled) {
@@ -497,12 +547,14 @@ function setFocusAnchorPlacementMode(enabled) {
 
 function syncFocusAnchorPlacementUi() {
   if (focusProvinceHint) {
-    focusProvinceHint.textContent = isFocusAnchorPlacementMode ? FOCUS_PLACEMENT_HINT_TEXT : FOCUS_HINT_TEXT;
+    focusProvinceHint.textContent = isFocusAnchorPlacementMode
+      ? FOCUS_PLACEMENT_HINT_TEXT
+      : "\u518d\u6b21\u70b9\u51fb\u653e\u5927\u7684\u7701\u4efd\u5730\u56fe\u5373\u53ef\u8fdb\u5165\u76f8\u518c\u9875\u9762\uff0c\u4e5f\u53ef\u4ee5\u5148\u70b9\u201c\u624b\u52a8\u653e\u7f6e\u201d\u521b\u5efa\u951a\u70b9\u3002";
   }
 
   if (focusCreateAnchorBtn) {
     focusCreateAnchorBtn.classList.toggle("is-active", isFocusAnchorPlacementMode);
-    focusCreateAnchorBtn.textContent = isFocusAnchorPlacementMode ? "取消放置" : "创建锚点";
+    focusCreateAnchorBtn.textContent = isFocusAnchorPlacementMode ? "取消放置" : "手动放置";
   }
 
   provinceFocusMap?.classList.toggle("is-anchor-placement", isFocusAnchorPlacementMode);
@@ -646,7 +698,7 @@ function renderFocusProvince(province) {
   subtitle.setAttribute("class", "focus-label-sub");
   subtitle.setAttribute("x", String(center.x));
   subtitle.setAttribute("y", String(center.y + 28));
-  subtitle.textContent = FOCUS_SUBTITLE_TEXT;
+  subtitle.textContent = "\u518d\u6b21\u70b9\u51fb\u653e\u5927\u5730\u56fe\u53ef\u76f4\u63a5\u8fdb\u5165\u76f8\u518c\u9875\u9762\uff0c\u70b9\u51fb\u5df2\u6709\u951a\u70b9\u4e5f\u53ef\u76f4\u63a5\u6253\u5f00";
   focusLabelLayer.append(title, subtitle);
 }
 
@@ -719,8 +771,17 @@ function handleChinaMapContextMenu(event) {
 }
 
 function handleFocusPointerDown(event) {
-  if (event.button !== 2) return;
-  createFocusAnchorFromEvent(event);
+  if (!(event.target instanceof Element) || event.target.closest("[data-anchor-id]")) return;
+
+  if (event.button === 2) {
+    createFocusAnchorFromEvent(event);
+    return;
+  }
+
+  if (event.button === 0 && isFocusAnchorPlacementMode) {
+    suppressNextFocusMapClick = true;
+    void createAnchorFromFocusMapClick(event);
+  }
 }
 
 function handleFocusContextMenu(event) {
@@ -732,20 +793,26 @@ async function createFocusAnchorFromEvent(event) {
   if (focusAnchorPromptPending) return;
   if (!(event.target instanceof Element) || !focusProvinceId || !focusTransform) return;
   if (event.target.closest("[data-anchor-id]")) return;
-  if (!isFocusProvincePlacementTarget(event.target)) return;
 
   const province = provinceById.get(focusProvinceId);
   if (!province) return;
 
   const focusPoint = toSvgPoint(provinceFocusMap, event.clientX, event.clientY);
-  const mapPoint = {
-    x: (focusPoint.x - focusTransform.translateX) / focusTransform.scale,
-    y: (focusPoint.y - focusTransform.translateY) / focusTransform.scale,
-  };
-  await createAnchorForProvince(province, mapPoint, { openFocus: true });
+  const useClickPoint = canCreateFocusAnchorFromTarget(event.target);
+  const mapPoint = useClickPoint
+    ? {
+      x: (focusPoint.x - focusTransform.translateX) / focusTransform.scale,
+      y: (focusPoint.y - focusTransform.translateY) / focusTransform.scale,
+    }
+    : province.centerPoint;
+  await createAnchorForProvince(province, mapPoint, {
+    openFocus: true,
+    requestName: false,
+  });
 }
 
 async function createAnchorFromFocusMapClick(event) {
+  event.preventDefault();
   if (!focusProvinceId || !focusTransform) return;
 
   const province = provinceById.get(focusProvinceId);
@@ -758,6 +825,7 @@ async function createAnchorFromFocusMapClick(event) {
   };
   const created = await createAnchorForProvince(province, mapPoint, {
     openFocus: true,
+    requestName: false,
   });
 
   if (created) {
@@ -777,7 +845,10 @@ async function createAnchorFromMainMapEvent(event) {
   if (!province) return;
 
   const mapPoint = toSvgPoint(chinaMap, event.clientX, event.clientY);
-  await createAnchorForProvince(province, mapPoint, { openFocus: true });
+  await createAnchorForProvince(province, mapPoint, {
+    openFocus: true,
+    requestName: false,
+  });
 }
 
 async function createAnchorForProvince(province, mapPoint, options = {}) {
@@ -792,7 +863,7 @@ async function createAnchorForProvince(province, mapPoint, options = {}) {
       : await requestAnchorName(defaultName);
     if (customName === null) return false;
 
-    state.anchors.push({
+    const nextAnchor = {
       id: createId("anchor"),
       name: customName.trim().slice(0, 32) || defaultName,
       provinceId: province.id,
@@ -802,12 +873,17 @@ async function createAnchorForProvince(province, mapPoint, options = {}) {
       createdAt: new Date().toISOString(),
       activeAlbumId: null,
       albums: [],
-    });
-    state.activeAnchorId = state.anchors.at(-1)?.id || null;
+    };
+    state.anchors.push(nextAnchor);
+    state.activeAnchorId = nextAnchor.id;
     selectedProvinceId = province.id;
     focusProvinceId = options.openFocus ? province.id : focusProvinceId;
     const saved = saveState();
     if (saved) {
+      if (options.navigateToGallery) {
+        openGalleryForAnchor(nextAnchor.id);
+        return true;
+      }
       render();
       showToast(TEXT.addAnchor);
     }
@@ -825,11 +901,15 @@ function clampAnchorPointToProvince(province, point) {
 }
 
 function requestAnchorName(defaultName) {
-  if (desktopBridge?.isElectron || typeof window.prompt !== "function") {
+  if (desktopBridge?.isElectron) {
     return requestAnchorNameWithDialog(defaultName);
   }
 
-  return Promise.resolve(window.prompt("请输入这个摄影展示页的名称：", defaultName));
+  if (typeof window.prompt === "function") {
+    return Promise.resolve(window.prompt("请输入这个摄影展示页的名称：", defaultName));
+  }
+
+  return requestAnchorNameWithDialog(defaultName);
 }
 
 function requestAnchorNameWithDialog(defaultName) {
@@ -872,6 +952,26 @@ function requestAnchorNameWithDialog(defaultName) {
 }
 
 function toSvgPoint(svg, clientX, clientY) {
+  const viewBox = svg?.viewBox?.baseVal;
+  const rect = typeof svg?.getBoundingClientRect === "function" ? svg.getBoundingClientRect() : null;
+  if (
+    rect
+    && rect.width > 0
+    && rect.height > 0
+    && viewBox
+    && Number.isFinite(viewBox.x)
+    && Number.isFinite(viewBox.y)
+    && Number.isFinite(viewBox.width)
+    && Number.isFinite(viewBox.height)
+    && viewBox.width > 0
+    && viewBox.height > 0
+  ) {
+    return {
+      x: viewBox.x + ((clientX - rect.left) / rect.width) * viewBox.width,
+      y: viewBox.y + ((clientY - rect.top) / rect.height) * viewBox.height,
+    };
+  }
+
   const point = svg.createSVGPoint();
   point.x = clientX;
   point.y = clientY;

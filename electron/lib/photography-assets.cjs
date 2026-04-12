@@ -1,10 +1,13 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
+const { nativeImage } = require('electron')
 
 const PHOTOGRAPHY_MODULE_ID = 'photography'
 const PHOTOGRAPHY_STORAGE_KEY = 'shanlic-photography-map-v1'
 const ASSETS_DIRNAME = 'photography-assets'
+const MAX_IMAGE_SIDE = 1800
+const JPEG_QUALITY = 86
 
 function createPhotographyAssetsManager({ storage }) {
   function sanitizeAssetName(name) {
@@ -85,6 +88,65 @@ function createPhotographyAssetsManager({ storage }) {
 
     fs.writeFileSync(targetPath, Buffer.from(base64, 'base64'))
     return buildAssetResult(targetPath)
+  }
+
+  function shouldCopySourceAsIs(extension) {
+    const normalizedExtension = String(extension || '').toLowerCase()
+    return normalizedExtension === '.gif' || normalizedExtension === '.svg'
+  }
+
+  function optimizeImportedRasterPhoto(sourcePath) {
+    const image = nativeImage.createFromPath(sourcePath)
+    if (image.isEmpty()) {
+      return null
+    }
+
+    const { width, height } = image.getSize()
+    if (!width || !height) {
+      return null
+    }
+
+    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(width, height))
+    const nextWidth = Math.max(1, Math.round(width * scale))
+    const nextHeight = Math.max(1, Math.round(height * scale))
+    const resized = scale < 1
+      ? image.resize({ width: nextWidth, height: nextHeight, quality: 'best' })
+      : image
+
+    return resized.toJPEG(JPEG_QUALITY)
+  }
+
+  function importPhotoFromPath(sourcePath, options = {}) {
+    const resolvedSourcePath = path.resolve(String(sourcePath || ''))
+    if (!resolvedSourcePath || !fs.existsSync(resolvedSourcePath) || !fs.statSync(resolvedSourcePath).isFile()) {
+      throw new Error('Photography source file does not exist.')
+    }
+
+    const parsedName = path.parse(resolvedSourcePath)
+    const sourceExtension = parsedName.ext || extensionFromMime(options.mimeType)
+    const baseName = parsedName.name || options.displayName || 'photo'
+    const shouldCopyAsIs = shouldCopySourceAsIs(sourceExtension)
+    const targetExtension = shouldCopyAsIs ? sourceExtension : '.jpg'
+    const targetPath = path.join(
+      getPhotographyAssetsRoot(),
+      createAssetName(targetExtension, baseName),
+    )
+
+    if (shouldCopyAsIs) {
+      fs.copyFileSync(resolvedSourcePath, targetPath)
+    } else {
+      const optimizedBuffer = optimizeImportedRasterPhoto(resolvedSourcePath)
+      if (optimizedBuffer) {
+        fs.writeFileSync(targetPath, optimizedBuffer)
+      } else {
+        fs.copyFileSync(resolvedSourcePath, targetPath)
+      }
+    }
+
+    return {
+      ...buildAssetResult(targetPath),
+      originalName: parsedName.base || path.basename(resolvedSourcePath),
+    }
   }
 
   function isPhotographyAssetPath(filePath) {
@@ -293,6 +355,7 @@ function createPhotographyAssetsManager({ storage }) {
     getPhotographyAssetsRoot,
     getAssetsRootForDirectory,
     getStorageInfoWithAssets,
+    importPhotoFromPath,
     savePhotoFromDataUrl,
     deletePhotoAsset,
     deletePhotoAssets,

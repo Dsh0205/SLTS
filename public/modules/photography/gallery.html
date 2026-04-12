@@ -11,7 +11,10 @@
   <main class="atlas-shell atlas-shell--gallery">
     <section class="gallery-view module-pop-surface delay-1">
       <div class="gallery-corner-tools module-pop-surface delay-2">
-        <button id="panelToggleBtn" class="gallery-plus-btn" type="button" aria-label="打开操作菜单" aria-expanded="false">+</button>
+        <button id="panelToggleBtn" class="gallery-plus-btn" type="button" aria-label="打开操作菜单" aria-expanded="false">
+          <img class="gallery-plus-icon" src="../words/img/Icons8/icons8-摄影-50.png" alt="" aria-hidden="true">
+          <span class="gallery-plus-close" aria-hidden="true">×</span>
+        </button>
         <div id="panelMenu" class="gallery-plus-menu" hidden>
           <div class="sidebar-actions sidebar-actions--menu">
             <button id="backToMapBtn" class="ghost-btn" type="button">返回地图</button>
@@ -52,7 +55,7 @@
         <div class="gallery-title-block">
           <p class="eyebrow">PHOTO ALBUMS</p>
           <h2 id="galleryTitle">摄影作品</h2>
-          <p id="galleryStatus" class="gallery-status">正在整理这个地点的摄影相册。</p>
+          <p id="galleryStatus" class="gallery-status" hidden></p>
         </div>
       </header>
 
@@ -62,13 +65,13 @@
             <button id="albumBackBtn" class="ghost-btn gallery-back-btn" type="button" hidden>返回相册列表</button>
             <div class="gallery-toolbar-copy">
               <strong id="contentTitle">相册书架</strong>
-              <span id="contentSubtitle">点击封面进入相册，选中照片后按 F2 可以重命名。</span>
+              <span id="contentSubtitle" hidden></span>
             </div>
           </div>
 
-          <div id="galleryEmpty" class="gallery-empty">
-            <strong>这里还没有任何内容</strong>
-            <p>先新建一个相册，再把你的摄影作品放进来。</p>
+          <div id="galleryEmpty" class="gallery-empty" hidden>
+            <strong></strong>
+            <p></p>
           </div>
 
           <div id="albumShelf" class="album-shelf"></div>
@@ -85,6 +88,31 @@
       <figcaption id="lightboxCaption"></figcaption>
     </figure>
   </div>
+
+  <dialog id="actionDialog" class="anchor-name-dialog" aria-labelledby="actionDialogTitle">
+    <form class="anchor-name-form" method="dialog">
+      <div class="anchor-name-copy">
+        <h2 id="actionDialogTitle">操作确认</h2>
+        <p id="actionDialogMessage">请确认当前操作。</p>
+      </div>
+      <label id="actionDialogField" class="anchor-name-field" for="actionDialogInput">
+        <span id="actionDialogLabel">名称</span>
+        <input
+          id="actionDialogInput"
+          class="anchor-name-input"
+          name="actionDialogInput"
+          type="text"
+          maxlength="40"
+          autocomplete="off"
+          spellcheck="false"
+        >
+      </label>
+      <menu class="anchor-name-actions">
+        <button id="actionDialogCancelBtn" class="anchor-name-btn anchor-name-btn--ghost" type="submit" value="cancel">取消</button>
+        <button id="actionDialogConfirmBtn" class="anchor-name-btn" type="submit" value="confirm">确定</button>
+      </menu>
+    </form>
+  </dialog>
 
   <div id="toast" class="toast" aria-live="polite"></div>
 

@@ -92,6 +92,10 @@ export function initGalleryPage() {
         showToast(TEXT.needAlbum);
         return;
       }
+      if (desktopBridge?.pickPhotographyPhotos) {
+        void handleDesktopPhotoImport();
+        return;
+      }
       dom.photoInput.click();
     });
     dom.deleteAlbumBtn.addEventListener("click", handleDeleteAlbum);
@@ -127,8 +131,9 @@ export function initGalleryPage() {
         return;
       }
 
-      if (event.key === "F2" && !event.repeat && !isTypingTarget(event.target) && renameSelectedPhoto()) {
+      if (event.key === "F2" && !event.repeat && !isTypingTarget(event.target)) {
         event.preventDefault();
+        void renameSelectedPhoto();
       }
     });
 
@@ -206,7 +211,8 @@ export function initGalleryPage() {
 
     const album = getActiveAlbum(state, anchor);
     dom.galleryTitle.textContent = anchor.name;
-    dom.galleryStatus.textContent = `${anchor.provinceName} · ${anchor.albums.length} 个相册 · ${getPhotoCount(anchor)} 张照片`;
+    dom.galleryStatus.hidden = true;
+    dom.galleryStatus.textContent = "";
     dom.anchorNameInput.value = anchor.name;
     dom.anchorProvinceValue.textContent = `所在省份 · ${anchor.provinceName}`;
     dom.anchorPositionValue.textContent = `地图坐标 · ${Math.round(anchor.x)} / ${Math.round(anchor.y)}`;
@@ -226,18 +232,17 @@ export function initGalleryPage() {
   }
 
   function renderToolbar(anchor, album) {
+    dom.contentSubtitle.hidden = true;
+    dom.contentSubtitle.textContent = "";
+
     if (viewMode === "album" && album) {
       dom.albumBackBtn.hidden = false;
       dom.contentTitle.textContent = album.name;
-      dom.contentSubtitle.textContent = `创建于 ${formatDateTime(album.createdAt)} · ${album.photos.length} 张照片 · 点击照片后按 F2 可重命名`;
       return;
     }
 
     dom.albumBackBtn.hidden = true;
     dom.contentTitle.textContent = "相册书架";
-    dom.contentSubtitle.textContent = anchor.albums.length > 0
-      ? "点击封面进入相册，创建时间会显示在相册卡片上。"
-      : "先新建一个相册，再把摄影作品放进来。";
   }
 
   function renderShelf(anchor) {
@@ -386,6 +391,16 @@ export function initGalleryPage() {
         setAlbumCover(album.id, photo.id);
       });
 
+      const renameButton = element("button", {
+        className: "gallery-delete-btn photo-action-btn",
+        type: "button",
+        textContent: "修改昵称",
+      });
+      renameButton.addEventListener("click", () => {
+        selectedPhotoId = photo.id;
+        void renameSelectedPhoto(photo.id);
+      });
+
       const deleteButton = element("button", {
         className: "gallery-delete-btn photo-action-btn",
         type: "button",
@@ -393,11 +408,11 @@ export function initGalleryPage() {
       });
       deleteButton.addEventListener("click", () => {
         selectedPhotoId = photo.id;
-        deletePhoto(album.id, photo.id);
+        void deletePhoto(album.id, photo.id);
       });
 
       const actions = element("div", { className: "photo-card-actions" });
-      actions.append(coverButton, deleteButton);
+      actions.append(coverButton, renameButton, deleteButton);
 
       const media = element("div", { className: "photo-card-media" });
       media.append(previewButton, actions);
@@ -417,17 +432,9 @@ export function initGalleryPage() {
   }
 
   function renderEmpty(anchor, album) {
-    if (viewMode === "album" && album) {
-      const isEmpty = album.photos.length === 0;
-      dom.galleryEmpty.hidden = !isEmpty;
-      dom.galleryEmptyTitle.textContent = TEXT.emptyAlbum;
-      dom.galleryEmptyText.textContent = "点击左上角菜单里的“导入照片”，先放几张作品进来，再选择一张作为封面。";
-      return;
-    }
-
-    dom.galleryEmpty.hidden = anchor.albums.length > 0;
-    dom.galleryEmptyTitle.textContent = TEXT.emptyShelf;
-    dom.galleryEmptyText.textContent = "点击左上角菜单里的“新建相册”，开始整理你的摄影作品。";
+    dom.galleryEmpty.hidden = true;
+    dom.galleryEmptyTitle.textContent = "";
+    dom.galleryEmptyText.textContent = "";
   }
 
   function openAlbum(albumId) {
@@ -462,13 +469,20 @@ export function initGalleryPage() {
     });
   }
 
-  function handleCreateAlbum() {
+  async function handleCreateAlbum() {
     const anchor = getActiveAnchor(state);
     if (!anchor) {
       return;
     }
 
-    const inputName = window.prompt("请输入相册名称：", createAlbumName(anchor));
+    const inputName = await requestTextInput({
+      title: "新建相册",
+      message: "请输入相册名称。",
+      label: "相册名称",
+      defaultValue: createAlbumName(anchor),
+      confirmText: "创建相册",
+      maxLength: 40,
+    });
     if (inputName === null) {
       return;
     }
@@ -496,8 +510,46 @@ export function initGalleryPage() {
     setPanelMenuOpen(false);
   }
 
-  async function handlePhotoSelection(event) {
-    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
+  async function handleDesktopPhotoImport() {
+    if (!desktopBridge?.pickPhotographyPhotos) {
+      return;
+    }
+
+    const album = getActiveAlbum(state, getActiveAnchor(state));
+    if (!album) {
+      return;
+    }
+
+    const previousLabel = dom.addPhotosBtn.textContent;
+    dom.addPhotosBtn.disabled = true;
+    dom.addPhotosBtn.textContent = "导入中...";
+
+    try {
+      const result = await desktopBridge.pickPhotographyPhotos();
+      if (result?.canceled) {
+        return;
+      }
+
+      const imported = Array.isArray(result?.photos)
+        ? result.photos.map((photo) => createDesktopImportedPhoto(photo)).filter(Boolean)
+        : [];
+
+      if (imported.length === 0) {
+        return;
+      }
+
+      await commitImportedPhotos(imported);
+    } catch (error) {
+      console.error(error);
+      showToast(TEXT.uploadError);
+    } finally {
+      dom.addPhotosBtn.disabled = !getActiveAlbum(state) || migrationBusy;
+      dom.addPhotosBtn.textContent = previousLabel;
+    }
+  }
+
+  async function handlePhotoSelectionLegacy(event) {
+    const files = Array.from(event.target.files || []).filter(isSupportedImageFile);
     dom.photoInput.value = "";
 
     const album = getActiveAlbum(state, getActiveAnchor(state));
@@ -505,9 +557,7 @@ export function initGalleryPage() {
       return;
     }
 
-    const previousState = structuredClone(state);
     const previousLabel = dom.addPhotosBtn.textContent;
-    const imported = [];
     dom.addPhotosBtn.disabled = true;
     dom.addPhotosBtn.textContent = "导入中...";
 
@@ -552,9 +602,99 @@ export function initGalleryPage() {
     }
   }
 
-  function handleDeleteAlbum() {
+  async function handlePhotoSelection(event) {
+    const files = Array.from(event.target.files || []).filter(isSupportedImageFile);
+    dom.photoInput.value = "";
+
     const album = getActiveAlbum(state, getActiveAnchor(state));
-    if (!album || !window.confirm(`确定删除相册“${album.name}”吗？这个相册里的照片也会一起删除。`)) {
+    if (files.length === 0 || !album) {
+      return;
+    }
+
+    const previousLabel = dom.addPhotosBtn.textContent;
+    dom.addPhotosBtn.disabled = true;
+    dom.addPhotosBtn.textContent = "导入中...";
+
+    try {
+      const imported = [];
+      for (const file of files) {
+        imported.push(await serializePhotoFile(file));
+      }
+
+      await commitImportedPhotos(imported);
+    } catch (error) {
+      console.error(error);
+      showToast(TEXT.uploadError);
+    } finally {
+      dom.addPhotosBtn.disabled = !getActiveAlbum(state) || migrationBusy;
+      dom.addPhotosBtn.textContent = previousLabel;
+    }
+  }
+
+  async function commitImportedPhotos(imported) {
+    const album = getActiveAlbum(state, getActiveAnchor(state));
+    if (!Array.isArray(imported) || imported.length === 0 || !album) {
+      return;
+    }
+
+    const previousState = structuredClone(state);
+
+    try {
+      const targetAlbum = getActiveAlbum(state, getActiveAnchor(state));
+      if (!targetAlbum) {
+        throw new Error("Target album is missing.");
+      }
+
+      targetAlbum.photos.unshift(...imported);
+      if (!targetAlbum.coverPhotoId) {
+        targetAlbum.coverPhotoId = imported[0]?.id || targetAlbum.photos[0]?.id || null;
+      }
+      selectedPhotoId = imported[0]?.id || selectedPhotoId;
+
+      if (!saveState(state)) {
+        throw new Error("Failed to persist imported photos.");
+      }
+
+      reloadState();
+      render();
+      showToast(TEXT.addPhotos);
+    } catch (error) {
+      await deletePhotoAssets(collectPhotoFilePaths(imported));
+      state = previousState;
+      reloadState();
+      render();
+      throw error;
+    }
+  }
+
+  function createDesktopImportedPhoto(photo) {
+    if (!photo?.filePath) {
+      return null;
+    }
+
+    const createdAt = new Date().toISOString();
+    const name = sanitizePhotoName(photo.originalName || photo.fileName, "未命名照片");
+    return {
+      id: createId("photo"),
+      name,
+      assetFileName: photo.fileName || "",
+      filePath: photo.filePath,
+      createdAt,
+    };
+  }
+
+  async function handleDeleteAlbum() {
+    const album = getActiveAlbum(state, getActiveAnchor(state));
+    if (!album) {
+      return;
+    }
+
+    const confirmed = await requestConfirmation({
+      title: "删除相册",
+      message: `确定删除相册“${album.name}”吗？这个相册里的照片也会一起删除。`,
+      confirmText: "删除相册",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -577,9 +717,18 @@ export function initGalleryPage() {
     }
   }
 
-  function handleDeleteAnchor() {
+  async function handleDeleteAnchor() {
     const anchor = getActiveAnchor(state);
-    if (!anchor || !window.confirm(`确定删除地点“${anchor.name}”吗？里面所有相册和照片都会一起移除。`)) {
+    if (!anchor) {
+      return;
+    }
+
+    const confirmed = await requestConfirmation({
+      title: "删除地点",
+      message: `确定删除地点“${anchor.name}”吗？里面所有相册和照片都会一起移除。`,
+      confirmText: "删除地点",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -608,10 +757,19 @@ export function initGalleryPage() {
     }, TEXT.setCover);
   }
 
-  function deletePhoto(albumId, photoId) {
+  async function deletePhoto(albumId, photoId) {
     const album = getAlbumById(getActiveAnchor(state), albumId);
     const photo = getPhotoById(album, photoId);
-    if (!photo || !window.confirm(`确定删除照片“${photo.name}”吗？`)) {
+    if (!photo) {
+      return;
+    }
+
+    const confirmed = await requestConfirmation({
+      title: "删除照片",
+      message: `确定删除照片“${photo.name}”吗？`,
+      confirmText: "删除照片",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -638,31 +796,36 @@ export function initGalleryPage() {
     }
   }
 
-  function renameSelectedPhoto() {
-    const photo = getPhotoById(getActiveAlbum(state), selectedPhotoId);
+  async function renameSelectedPhoto(photoId = selectedPhotoId) {
+    const photo = getPhotoById(getActiveAlbum(state), photoId);
     if (viewMode !== "album" || !photo) {
       showToast(TEXT.selectPhotoFirst);
-      return true;
+      return;
     }
 
-    const inputName = window.prompt("修改照片名称：", photo.name);
+    const inputName = await requestTextInput({
+      title: "重命名照片",
+      message: "请输入新的照片名称。",
+      label: "照片名称",
+      defaultValue: photo.name,
+      confirmText: "保存名称",
+      maxLength: 80,
+    });
     if (inputName === null) {
-      return true;
+      return;
     }
 
     const nextName = sanitizePhotoName(inputName, photo.name);
     if (nextName === photo.name) {
-      return true;
+      return;
     }
 
     commit(() => {
-      const targetPhoto = getPhotoById(getActiveAlbum(state), selectedPhotoId);
+      const targetPhoto = getPhotoById(getActiveAlbum(state), photoId);
       if (targetPhoto) {
         targetPhoto.name = nextName;
       }
     }, TEXT.renamePhoto);
-
-    return true;
   }
 
   function openLightbox(photo) {
@@ -794,7 +957,8 @@ export function initGalleryPage() {
   function setPanelMenuOpen(open) {
     dom.panelMenu.hidden = !open;
     dom.panelToggleBtn.setAttribute("aria-expanded", String(open));
-    dom.panelToggleBtn.textContent = open ? "×" : "+";
+    dom.panelToggleBtn.classList.toggle("is-open", open);
+    dom.panelToggleBtn.setAttribute("aria-label", open ? "关闭操作菜单" : "打开操作菜单");
   }
 
   async function refreshStorageInfo() {
@@ -887,6 +1051,107 @@ export function initGalleryPage() {
     }
   }
 
+  function isSupportedImageFile(file) {
+    if (!file) {
+      return false;
+    }
+
+    if (typeof file.type === "string" && file.type.startsWith("image/")) {
+      return true;
+    }
+
+    return /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i.test(String(file.name || ""));
+  }
+
+  async function requestTextInput(options = {}) {
+    if (!(dom.actionDialog instanceof HTMLDialogElement) || !(dom.actionDialogInput instanceof HTMLInputElement)) {
+      const fallbackValue = typeof window.prompt === "function"
+        ? window.prompt(options.message || "请输入名称：", options.defaultValue || "")
+        : options.defaultValue || "";
+      return fallbackValue === null ? null : String(fallbackValue);
+    }
+
+    const result = await openActionDialog({
+      title: options.title || "请输入名称",
+      message: options.message || "请输入内容。",
+      label: options.label || "名称",
+      defaultValue: options.defaultValue || "",
+      confirmText: options.confirmText || "确定",
+      cancelText: options.cancelText || "取消",
+      showInput: true,
+      maxLength: options.maxLength || 40,
+    });
+
+    return result.confirmed ? result.value : null;
+  }
+
+  async function requestConfirmation(options = {}) {
+    if (!(dom.actionDialog instanceof HTMLDialogElement)) {
+      return typeof window.confirm === "function"
+        ? window.confirm(options.message || "确定继续吗？")
+        : false;
+    }
+
+    const result = await openActionDialog({
+      title: options.title || "操作确认",
+      message: options.message || "请确认当前操作。",
+      confirmText: options.confirmText || "确定",
+      cancelText: options.cancelText || "取消",
+      showInput: false,
+    });
+
+    return result.confirmed;
+  }
+
+  function openActionDialog(options = {}) {
+    if (!(dom.actionDialog instanceof HTMLDialogElement)) {
+      return Promise.resolve({ confirmed: false, value: "" });
+    }
+
+    if (dom.actionDialog.open) {
+      dom.actionDialog.close("cancel");
+    }
+
+    dom.actionDialogTitle.textContent = options.title || "操作确认";
+    dom.actionDialogMessage.textContent = options.message || "请确认当前操作。";
+    dom.actionDialogConfirmBtn.textContent = options.confirmText || "确定";
+    dom.actionDialogCancelBtn.textContent = options.cancelText || "取消";
+
+    const showInput = Boolean(options.showInput);
+    dom.actionDialogField.hidden = !showInput;
+    dom.actionDialogInput.value = showInput ? String(options.defaultValue || "") : "";
+    dom.actionDialogInput.maxLength = Number(options.maxLength) || 40;
+    dom.actionDialogInput.placeholder = showInput ? String(options.placeholder || "") : "";
+    dom.actionDialogLabel.textContent = options.label || "名称";
+
+    return new Promise((resolve) => {
+      const handleClose = () => {
+        resolve({
+          confirmed: dom.actionDialog.returnValue === "confirm",
+          value: dom.actionDialogInput.value,
+        });
+      };
+
+      dom.actionDialog.addEventListener("close", handleClose, { once: true });
+
+      try {
+        dom.actionDialog.showModal();
+        window.requestAnimationFrame(() => {
+          if (showInput) {
+            dom.actionDialogInput.focus();
+            dom.actionDialogInput.select();
+            return;
+          }
+
+          dom.actionDialogConfirmBtn.focus();
+        });
+      } catch {
+        dom.actionDialog.removeEventListener("close", handleClose);
+        resolve({ confirmed: false, value: "" });
+      }
+    });
+  }
+
   function showToast(message) {
     dom.toast.textContent = message;
     dom.toast.classList.add("show");
@@ -931,6 +1196,14 @@ function getDom() {
     lightboxImage: document.getElementById("lightboxImage"),
     lightboxCaption: document.getElementById("lightboxCaption"),
     lightboxCloseBtn: document.getElementById("lightboxCloseBtn"),
+    actionDialog: document.getElementById("actionDialog"),
+    actionDialogTitle: document.getElementById("actionDialogTitle"),
+    actionDialogMessage: document.getElementById("actionDialogMessage"),
+    actionDialogField: document.getElementById("actionDialogField"),
+    actionDialogLabel: document.getElementById("actionDialogLabel"),
+    actionDialogInput: document.getElementById("actionDialogInput"),
+    actionDialogCancelBtn: document.getElementById("actionDialogCancelBtn"),
+    actionDialogConfirmBtn: document.getElementById("actionDialogConfirmBtn"),
     toast: document.getElementById("toast"),
   };
 }

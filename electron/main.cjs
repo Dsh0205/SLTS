@@ -12,6 +12,14 @@ const DEV_SERVER_URL = 'http://127.0.0.1:5173'
 const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png')
 const PRELOAD_PATH = path.join(__dirname, 'preload.cjs')
 
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception in main process.', error)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection in main process.', reason)
+})
+
 function getAutoLaunchState() {
   if (!app.isPackaged) {
     return {

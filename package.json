@@ -1,6 +1,6 @@
 {
   "name": "shanlic-life-tracker-system",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "private": true,
   "main": "electron/main.cjs",
   "type": "module",
@@ -54,10 +54,12 @@
       "package.json"
     ],
     "directories": {
-      "buildResources": "public"
+      "buildResources": "public",
+      "output": "release"
     },
     "win": {
       "icon": "electron/assets/icon-256.png",
+      "executableName": "SHANLIC LIFE TRACKER SYSTEM",
       "target": [
         "nsis"
       ]
