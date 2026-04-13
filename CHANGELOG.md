@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.4 - 2026-04-13
+
+### Added
+- Notes desktop mode now supports exporting the current note as a `.jpg` image while keeping the existing `.txt` export entry.
+
+### Fixed
+- The desktop floating notes window now opens as an independent top-level window instead of staying attached to the main editor.
+
 ## 1.6.1修改日志
 
 - 简化黑色小球四象限页，移除顶部说明文字，改成贴边的小图标工具栏，不再为顶部说明预留整块空白。

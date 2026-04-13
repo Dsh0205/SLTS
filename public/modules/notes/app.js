@@ -63,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const editBtn = document.getElementById('note-menu-edit-btn');
   const importBtn = document.getElementById('note-menu-import-btn');
   const exportBtn = document.getElementById('note-menu-export-btn');
-  const importInput = document.getElementById('import-file-input');
 
   const editorView = document.getElementById('editor-view');
   const editorViewTitle = document.getElementById('editor-view-title');
@@ -266,58 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
   });
 
-  importBtn.addEventListener('click', () => {
+  importBtn?.addEventListener('click', async () => {
     closeNoteMenu();
-    if (!ensureStorageWritable()) return;
-
-    if (activeNoteId) {
-      importInput.click();
-    }
-  });
-
-  importInput.addEventListener('change', (event) => {
-    const [file] = event.target.files || [];
-    if (!file || !activeNoteId) return;
-
-    if (!confirm('导入会覆盖当前笔记内容，确定继续吗？')) {
-      importInput.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      if (!ensureStorageWritable()) return;
-
-      const note = findNoteById(activeNoteId);
-      if (!note) return;
-
-      const previousContent = note.content;
-      const previousLastModified = note.lastModified;
-      const previousUpdatedAt = note.updatedAt;
-      note.content = String(loadEvent.target.result || '');
-      note.lastModified = new Date().toLocaleString();
-      note.updatedAt = Date.now();
-      if (!saveNotes()) {
-        note.content = previousContent;
-        note.lastModified = previousLastModified;
-        note.updatedAt = previousUpdatedAt;
-        return;
-      }
-
-      const latest = findNoteById(activeNoteId);
-      renderViewer(latest);
-
-      if (isMainEditorVisible() || isEditorVisible()) {
-        loadDraftFromNote(latest, `最后修改时间：${latest.lastModified}`);
-      } else {
-        updateStatus(`最后修改时间：${latest.lastModified}`);
-      }
-
-      renderNoteList(getSearchQuery());
-      showToast('导入成功。');
-    };
-    reader.readAsText(file);
-    importInput.value = '';
+    await exportActiveNoteAsJpg();
   });
 
   mainTitleInput.addEventListener('input', () => handleDraftInput('main'));
@@ -597,7 +547,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (importBtn) {
-      importBtn.disabled = storageProtectionActive || !activeNote;
+      importBtn.hidden = !desktopBridge?.isElectron;
+      importBtn.disabled = !desktopBridge?.isElectron || !activeNote;
     }
 
     if (exportBtn) {
@@ -1481,7 +1432,6 @@ document.addEventListener('DOMContentLoaded', () => {
       panelOpenMainBtn,
       editBtn,
       inlineDesktopBtn,
-      importBtn,
       panelSaveBtn,
       saveMainBtn,
       submitBtn,
@@ -1532,6 +1482,123 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function cloneNotesSnapshot(list = notes) {
     return hydrateNotesFromStorage(list);
+  }
+
+  async function exportActiveNoteAsJpg() {
+    if (!desktopBridge?.exportNoteAsJpg) {
+      showToast('当前环境暂不支持导出 JPG');
+      return false;
+    }
+
+    const hadUnsavedChanges = hasUnsavedChanges();
+    const latest = hadUnsavedChanges
+      ? saveCurrentNote({ announce: false })
+      : (activeNoteId ? findNoteById(activeNoteId) : null);
+
+    if (hadUnsavedChanges && !latest) {
+      showToast('当前笔记保存失败，暂时无法导出 JPG');
+      return false;
+    }
+
+    const note = latest ?? (activeNoteId ? findNoteById(activeNoteId) : null);
+    if (!note) {
+      return false;
+    }
+
+    try {
+      const result = await desktopBridge.exportNoteAsJpg(buildNoteJpgExportPayload(note));
+      if (result?.canceled) {
+        return false;
+      }
+
+      if (!result?.fileName) {
+        showToast('JPG 导出失败，请重试');
+        return false;
+      }
+
+      showToast(`已导出 JPG：${result.fileName}`);
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast(error?.message || 'JPG 导出失败，请重试');
+      return false;
+    }
+  }
+
+  function buildNoteJpgExportPayload(note) {
+    const parser = typeof markedInstance?.parse === 'function' ? markedInstance : marked;
+    const contentHtml = parser.parse(note?.content || '');
+
+    return {
+      title: note?.title || '无标题笔记',
+      lastModified: note?.lastModified || '',
+      contentHtml: sanitizeNoteExportMarkup(contentHtml),
+    };
+  }
+
+  function sanitizeNoteExportMarkup(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${String(html || '')}</div>`, 'text/html');
+    const root = doc.body.firstElementChild;
+
+    if (!root) {
+      return '';
+    }
+
+    root.querySelectorAll('script, iframe, object, embed, link, style, meta, base').forEach((element) => {
+      element.remove();
+    });
+
+    root.querySelectorAll('*').forEach((element) => {
+      Array.from(element.attributes).forEach((attribute) => {
+        const normalizedName = attribute.name.toLowerCase();
+        if (normalizedName.startsWith('on')) {
+          element.removeAttribute(attribute.name);
+          return;
+        }
+
+        if (normalizedName === 'href' || normalizedName === 'src' || normalizedName === 'poster') {
+          const nextValue = sanitizeNoteExportUrl(attribute.value);
+          if (nextValue) {
+            element.setAttribute(attribute.name, nextValue);
+          } else {
+            element.removeAttribute(attribute.name);
+          }
+          return;
+        }
+
+        if (normalizedName === 'target') {
+          element.removeAttribute(attribute.name);
+        }
+      });
+
+      if (element.tagName === 'A' && element.getAttribute('href')) {
+        element.setAttribute('rel', 'noreferrer noopener');
+      }
+    });
+
+    return root.innerHTML;
+  }
+
+  function sanitizeNoteExportUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return '';
+    }
+
+    if (/^(javascript|vbscript):/i.test(raw)) {
+      return '';
+    }
+
+    if (/^data:/i.test(raw) && !/^data:(image|video)\//i.test(raw)) {
+      return '';
+    }
+
+    try {
+      return new URL(raw, window.location.href).toString();
+    } catch {
+      return '';
+    }
   }
 
   async function openDesktopFloatingEditor() {

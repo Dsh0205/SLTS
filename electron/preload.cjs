@@ -156,6 +156,9 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   saveJsonFile(payload) {
     return ipcRenderer.invoke('desktop-files:save-json', payload)
   },
+  exportNoteAsJpg(payload) {
+    return ipcRenderer.invoke('desktop-notes:export-jpg', payload)
+  },
   pickNoteImage() {
     return ipcRenderer.invoke('desktop-notes:pick-image')
   },

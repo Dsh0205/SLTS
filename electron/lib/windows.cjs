@@ -95,10 +95,7 @@ function createWindowsManager({
       return floatingNotesWindow
     }
 
-    const parentWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
-
     floatingNotesWindow = new BrowserWindow({
-      parent: parentWindow ?? undefined,
       width: 430,
       height: 760,
       minWidth: 360,
@@ -119,6 +116,7 @@ function createWindowsManager({
       title: '悬浮笔记窗',
       icon: iconPath,
       alwaysOnTop: floatingNotesPinned,
+      // Keep this as a top-level window so it can detach from the main editor.
       skipTaskbar: false,
       webPreferences: {
         preload: preloadPath,
