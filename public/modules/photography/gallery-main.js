@@ -20,6 +20,9 @@ import {
   resolvePhotoSource,
 } from "./photo-storage.js";
 
+const GALLERY_OPEN_MESSAGE_TYPE = "shanlic:open-photography-gallery";
+const GALLERY_CLOSE_MESSAGE_TYPE = "shanlic:close-photography-gallery";
+
 export function initGalleryPage() {
   const desktopBridge = window.shanlicDesktop || null;
   const params = new URLSearchParams(window.location.search);
@@ -37,6 +40,7 @@ export function initGalleryPage() {
   let migrationBusy = false;
   let animateAlbumEntry = false;
   let animateShelfEntry = true;
+  let contentReplayFrame = 0;
 
   if (document.body) {
     document.body.dataset.embedded = embedded ? "true" : "false";
@@ -48,7 +52,6 @@ export function initGalleryPage() {
 
   if (anchorIdFromQuery && state.anchors.some((anchor) => anchor.id === anchorIdFromQuery) && state.activeAnchorId !== anchorIdFromQuery) {
     state.activeAnchorId = anchorIdFromQuery;
-    saveState(state);
   }
 
   if (!getActiveAnchor(state)) {
@@ -158,6 +161,8 @@ export function initGalleryPage() {
       render();
     });
 
+    window.addEventListener("message", handleParentMessage);
+
     desktopBridge?.onMirroredStorageChanged?.((moduleId) => {
       if (moduleId !== "photography") {
         return;
@@ -173,8 +178,7 @@ export function initGalleryPage() {
     });
   }
 
-  function reloadState() {
-    state = loadState();
+  function syncViewStateWithActiveSelection() {
     const anchor = getActiveAnchor(state);
     const album = getActiveAlbum(state, anchor);
 
@@ -188,8 +192,106 @@ export function initGalleryPage() {
     if (viewMode !== "album" || !album || !album.photos.some((photo) => photo.id === selectedPhotoId)) {
       selectedPhotoId = null;
     }
+  }
 
+  function reloadState() {
+    state = loadState();
+    syncViewStateWithActiveSelection();
     syncLightbox();
+  }
+
+  function activateAnchorInMemory(anchorId) {
+    if (!anchorId || !state.anchors.some((anchor) => anchor.id === anchorId)) {
+      return false;
+    }
+
+    state.activeAnchorId = anchorId;
+    syncViewStateWithActiveSelection();
+    syncLightbox();
+    return true;
+  }
+
+  function handleParentMessage(event) {
+    if (!embedded || !event?.data || typeof event.data !== "object") {
+      return;
+    }
+
+    if (event.source && event.source !== window.parent) {
+      return;
+    }
+
+    if (event.data.type !== GALLERY_OPEN_MESSAGE_TYPE) {
+      return;
+    }
+
+    handleGalleryOpenMessage(event.data);
+  }
+
+  function handleGalleryOpenMessage(message) {
+    const nextAnchorId = typeof message?.anchorId === "string" ? message.anchorId : "";
+    const anchorChanged = Boolean(nextAnchorId) && state.activeAnchorId !== nextAnchorId;
+
+    if (anchorChanged && !activateAnchorInMemory(nextAnchorId)) {
+      reloadState();
+      activateAnchorInMemory(nextAnchorId);
+    }
+
+    closeLightbox();
+
+    if (message?.replayContent && !anchorChanged && replayVisibleEntryNodes()) {
+      return;
+    }
+
+    if (message?.replayContent) {
+      replayCurrentViewEntry();
+    }
+    render();
+  }
+
+  function replayCurrentViewEntry() {
+    if (viewMode === "album" && getActiveAlbum(state, getActiveAnchor(state))) {
+      animateAlbumEntry = true;
+      return;
+    }
+
+    animateShelfEntry = true;
+  }
+
+  function replayVisibleEntryNodes() {
+    if (viewMode === "album") {
+      const cards = Array.from(dom.photoGrid.querySelectorAll(".photo-card"));
+      if (dom.photoGrid.hidden || cards.length === 0) {
+        return false;
+      }
+
+      restartEntryAnimations(cards, ["photo-card--entering"], (card, index) => {
+        card.style.setProperty("--enter-index", String(index));
+      });
+      return true;
+    }
+
+    const cards = Array.from(dom.albumShelf.querySelectorAll(".album-card"));
+    if (dom.albumShelf.hidden || cards.length === 0) {
+      return false;
+    }
+
+    restartEntryAnimations(cards, ["module-pop-stagger", "is-bounce"], (card, index) => {
+      card.style.setProperty("--module-pop-index", String(index));
+    });
+    return true;
+  }
+
+  function restartEntryAnimations(nodes, classNames, applyIndex) {
+    window.cancelAnimationFrame(contentReplayFrame);
+    nodes.forEach((node) => {
+      node.classList.remove(...classNames);
+    });
+    contentReplayFrame = window.requestAnimationFrame(() => {
+      nodes.forEach((node, index) => {
+        applyIndex(node, index);
+        node.classList.add(...classNames);
+      });
+    });
   }
 
   function commit(mutator, successMessage = "") {
@@ -198,13 +300,15 @@ export function initGalleryPage() {
 
     if (!saveState(state)) {
       state = previousState;
-      reloadState();
+      syncViewStateWithActiveSelection();
+      syncLightbox();
       render();
       showToast(TEXT.saveError);
       return false;
     }
 
-    reloadState();
+    syncViewStateWithActiveSelection();
+    syncLightbox();
     render();
     if (successMessage) {
       showToast(successMessage);
@@ -563,61 +667,6 @@ export function initGalleryPage() {
       dom.addPhotosBtn.textContent = previousLabel;
     }
   }
-
-  async function handlePhotoSelectionLegacy(event) {
-    const files = Array.from(event.target.files || []).filter(isSupportedImageFile);
-    dom.photoInput.value = "";
-
-    const album = getActiveAlbum(state, getActiveAnchor(state));
-    if (files.length === 0 || !album) {
-      return;
-    }
-
-    const previousLabel = dom.addPhotosBtn.textContent;
-    dom.addPhotosBtn.disabled = true;
-    dom.addPhotosBtn.textContent = "导入中...";
-
-    try {
-      for (const file of files) {
-        imported.push(await serializePhotoFile(file));
-      }
-
-      const targetAlbum = getActiveAlbum(state, getActiveAnchor(state));
-      if (!targetAlbum) {
-        throw new Error("Target album is missing.");
-      }
-
-      targetAlbum.photos.unshift(...imported);
-      if (!targetAlbum.coverPhotoId) {
-        targetAlbum.coverPhotoId = imported[0]?.id || targetAlbum.photos[0]?.id || null;
-      }
-      selectedPhotoId = imported[0]?.id || selectedPhotoId;
-
-      if (!saveState(state)) {
-        await deletePhotoAssets(collectPhotoFilePaths(imported));
-        state = previousState;
-        reloadState();
-        render();
-        showToast(TEXT.saveError);
-        return;
-      }
-
-      reloadState();
-      render();
-      showToast(TEXT.addPhotos);
-    } catch (error) {
-      console.error(error);
-      await deletePhotoAssets(collectPhotoFilePaths(imported));
-      state = previousState;
-      reloadState();
-      render();
-      showToast(TEXT.uploadError);
-    } finally {
-      dom.addPhotosBtn.disabled = !getActiveAlbum(state) || migrationBusy;
-      dom.addPhotosBtn.textContent = previousLabel;
-    }
-  }
-
   async function handlePhotoSelection(event) {
     const files = Array.from(event.target.files || []).filter(isSupportedImageFile);
     dom.photoInput.value = "";
@@ -671,13 +720,15 @@ export function initGalleryPage() {
         throw new Error("Failed to persist imported photos.");
       }
 
-      reloadState();
+      syncViewStateWithActiveSelection();
+      syncLightbox();
       render();
       showToast(TEXT.addPhotos);
     } catch (error) {
       await deletePhotoAssets(collectPhotoFilePaths(imported));
       state = previousState;
-      reloadState();
+      syncViewStateWithActiveSelection();
+      syncLightbox();
       render();
       throw error;
     }
@@ -947,14 +998,16 @@ export function initGalleryPage() {
         throw new Error("Failed to persist externalized photography state.");
       }
 
-      reloadState();
+      syncViewStateWithActiveSelection();
+      syncLightbox();
       render();
       showToast(TEXT.migrateSuccess);
     } catch (error) {
       console.error(error);
       await deletePhotoAssets(migratedPaths);
       state = previousState;
-      reloadState();
+      syncViewStateWithActiveSelection();
+      syncLightbox();
       render();
       showToast(TEXT.migrateError);
     } finally {
@@ -1180,7 +1233,7 @@ export function initGalleryPage() {
   function leaveGallery(reason = "close") {
     if (embedded && window.parent && window.parent !== window) {
       window.parent.postMessage({
-        type: "shanlic:close-photography-gallery",
+        type: GALLERY_CLOSE_MESSAGE_TYPE,
         reason,
       }, "*");
       return;
