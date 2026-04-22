@@ -77,8 +77,8 @@ for (const module of orbitModules) {
 
 export const centerModule: ModuleDefinition = createModule(
   'hobby',
-  '\u7231\u597d\u8ffd\u8e2a\u8868',
-  '\u6708\u5ea6\u8bb0\u5f55\u4e0e\u6253\u5361',
+  '\u6253\u5361\u70ed\u529b\u56fe',
+  '365 \u5929\u4f7f\u7528\u8f68\u8ff9',
   '#ff9b32',
   '#ffd08a',
   'modules/hobby/index.html',

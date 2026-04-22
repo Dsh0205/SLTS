@@ -1,8 +1,9 @@
 import { addEntriesToGroup, collectEntriesFromGroups as collectEntriesFromGroupsInGroups, createNamedGroup, cloneGroup as cloneGroupFromLibrary, ensureValidActiveGroupId, findEntryInGroup, findGroup as findGroupInGroups, removeEntryFromGroup, removeGroup } from "./library.js";
 import { deleteTextAtCursor as deleteTextAtCursorInInput, insertTextAtCursor as insertTextAtCursorInInput } from "./input.js";
 import { parseManualEntries as parseManualEntriesFromManual } from "./manual.js";
+import { buildGroupProgressMap, buildGroupProgressSummary, createEmptyWordProgress, getMasteredProgressKeys, getWrongProgressKeys, normalizeWordProgress, pruneWordProgress, updateWordProgress } from "./progress.js";
 import { buildOptionItems as buildOptionItemsFromQuiz, buildRoundEntries as buildRoundEntriesForRound, getEntryKey as getEntryKeyFromQuiz, getRemainingPracticeEntries as getRemainingPracticeEntriesForPractice, getWrongRecordKey as getWrongRecordKeyFromQuiz, hasNextRoundAvailable as hasNextRoundAvailableForPractice, hasSufficientQuizEntries as hasSufficientQuizEntriesFromQuiz, pickQuestionEntry as pickQuestionEntryForQuiz, shuffleArray as shuffleArrayFromQuiz } from "./quiz.js";
-import { hideRoundCelebrationUI, playRoundCompletionRevealUI, renderCelebrationEffectUI, renderGroupSelectorUI, renderQuizOptionsUI, renderResultStatsUI, renderRoundProgressUI, renderWordColumnUI, renderWrongRecordsUI, syncGroupSelectOptions } from "./render.js";
+import { hideRoundCelebrationUI, playRoundCompletionRevealUI, renderCelebrationEffectUI, renderGroupProgressPanelUI, renderGroupSelectorUI, renderQuizOptionsUI, renderResultStatsUI, renderRoundProgressUI, renderWordColumnUI, renderWrongRecordsUI, syncGroupSelectOptions } from "./render.js";
 import { applyAnswerState, createClearedPracticeState, createExitedSessionState, createPreparedRoundState, createRoundMetricsResetState, createStartedSessionState } from "./session.js";
 import { playFinishPracticeSound, playRoundCompleteSound, playWrongAnswerSound } from "./sound.js";
 import { buildWordLibraryPayload as buildWordLibraryPayloadFromStorage, loadWordBanksFromStorage, saveWordBanksToStorage } from "./storage.js";
@@ -19,6 +20,7 @@ const wordBanks = {
   russian: { label: "俄语", locale: "ru", groups: [] }
 };
 
+let wordProgress = createEmptyWordProgress();
 const wrongRecords = new Map();
 
 let currentMode = "english";
@@ -42,6 +44,7 @@ let pendingGroupMode = "english";
 let pendingGroupSelection = new Set();
 let masteredEntryKeys = new Set();
 let carryOverWrongKeys = new Set();
+let wordsSearchQuery = "";
 
 const activeLibraryGroupIds = {
   english: "",
@@ -65,6 +68,7 @@ function applySessionState(nextState) {
   if ("roundCelebrationVisible" in nextState) roundCelebrationVisible = nextState.roundCelebrationVisible;
   if ("masteredEntryKeys" in nextState) masteredEntryKeys = nextState.masteredEntryKeys;
   if ("carryOverWrongKeys" in nextState) carryOverWrongKeys = nextState.carryOverWrongKeys;
+  syncQuizDeleteButtonState();
 }
 
 const app = document.getElementById("app");
@@ -107,6 +111,20 @@ const englishGroupSelect = document.getElementById("englishGroupSelect");
 const russianGroupSelect = document.getElementById("russianGroupSelect");
 const englishGroupsPreview = document.getElementById("englishGroupsPreview");
 const russianGroupsPreview = document.getElementById("russianGroupsPreview");
+const englishProgressBody = document.getElementById("englishProgressBody");
+const englishProgressEmpty = document.getElementById("englishProgressEmpty");
+const englishProgressStats = document.getElementById("englishProgressStats");
+const englishMasteredList = document.getElementById("englishMasteredList");
+const englishMasteredEmpty = document.getElementById("englishMasteredEmpty");
+const englishWrongProgressList = document.getElementById("englishWrongProgressList");
+const englishWrongProgressEmpty = document.getElementById("englishWrongProgressEmpty");
+const russianProgressBody = document.getElementById("russianProgressBody");
+const russianProgressEmpty = document.getElementById("russianProgressEmpty");
+const russianProgressStats = document.getElementById("russianProgressStats");
+const russianMasteredList = document.getElementById("russianMasteredList");
+const russianMasteredEmpty = document.getElementById("russianMasteredEmpty");
+const russianWrongProgressList = document.getElementById("russianWrongProgressList");
+const russianWrongProgressEmpty = document.getElementById("russianWrongProgressEmpty");
 
 const wrongList = document.getElementById("wrongList");
 const wrongEmptyState = document.getElementById("wrongEmptyState");
@@ -119,8 +137,10 @@ const englishWordsList = document.getElementById("englishWordsList");
 const russianWordsList = document.getElementById("russianWordsList");
 const englishWordsEmpty = document.getElementById("englishWordsEmpty");
 const russianWordsEmpty = document.getElementById("russianWordsEmpty");
+const wordsSearchInput = document.getElementById("wordsSearchInput");
 
 const exitBtn = document.getElementById("exitBtn");
+const deleteCurrentWordBtn = document.getElementById("deleteCurrentWordBtn");
 const questionWord = document.getElementById("questionWord");
 const options = document.getElementById("options");
 const questionCard = document.querySelector(".simple-question-card");
@@ -174,6 +194,7 @@ initRussianKeyboard();
 loadSavedWords();
 syncLibrarySelectors();
 refreshAllDisplays();
+syncQuizDeleteButtonState();
 showView("home");
 
 homeStartBtn.addEventListener("click", () => showView("mode"));
@@ -200,8 +221,10 @@ englishCreateGroupBtn.addEventListener("click", () => createGroupFromInput("engl
 russianCreateGroupBtn.addEventListener("click", () => createGroupFromInput("russian"));
 englishGroupSelect.addEventListener("change", () => setActiveLibraryGroup("english", englishGroupSelect.value));
 russianGroupSelect.addEventListener("change", () => setActiveLibraryGroup("russian", russianGroupSelect.value));
+wordsSearchInput.addEventListener("input", () => updateWordsSearchQuery(wordsSearchInput.value));
 
 exitBtn.addEventListener("click", finishPracticeLoop);
+deleteCurrentWordBtn.addEventListener("click", deleteCurrentQuestionEntry);
 roundContinueBtn.addEventListener("click", continueNextRound);
 roundStopBtn.addEventListener("click", finishPracticeLoop);
 
@@ -222,6 +245,10 @@ function showView(viewName) {
   resultView.classList.toggle("active", viewName === "result");
   libraryView.classList.toggle("active", viewName === "library");
   wordsView.classList.toggle("active", viewName === "words");
+
+  if (viewName === "library" || viewName === "words") {
+    refreshAllDisplays();
+  }
 
   if (viewName !== "mode") {
     hideGroupSelector();
@@ -308,6 +335,8 @@ function refreshAllDisplays() {
   syncLibrarySelectors();
   renderGroupPreview("english", englishGroupsPreview);
   renderGroupPreview("russian", russianGroupsPreview);
+  renderGroupProgressDetails("english");
+  renderGroupProgressDetails("russian");
   renderWrongRecords();
   renderResultStats();
   renderRoundProgress();
@@ -316,7 +345,8 @@ function refreshAllDisplays() {
 
 function openGroupSelector(mode) {
   const groups = getGroups(mode);
-  const availableGroups = groups.filter((group) => group.entries.length > 0);
+  const progressMap = getGroupProgressMapForMode(mode);
+  const availableGroups = groups.filter((group) => isGroupReadyForPractice(group, progressMap[group.id]));
 
   if (groups.length === 0) {
     showToast("Please create a group in the " + wordBanks[mode].label + " library first.", "error");
@@ -325,7 +355,7 @@ function openGroupSelector(mode) {
   }
 
   if (availableGroups.length === 0) {
-    showToast("There is no group available for testing yet. Add some words first.", "error");
+    showToast("\u8fd9\u4e2a\u8bcd\u5e93\u91cc\u53ef\u7ee7\u7eed\u7ec3\u4e60\u7684\u672a\u80cc\u5355\u8bcd\u5df2\u7ecf\u4e0d\u8db3\u4e86\u3002", "error");
     showView("library");
     return;
   }
@@ -343,6 +373,7 @@ function hideGroupSelector() {
 }
 
 function renderGroupSelector() {
+  const progressMap = getGroupProgressMapForMode(pendingGroupMode);
   renderGroupSelectorUI({
     groups: getGroups(pendingGroupMode),
     label: wordBanks[pendingGroupMode].label,
@@ -351,6 +382,13 @@ function renderGroupSelector() {
     hintElement: groupSelectorHint,
     listElement: groupSelectorList,
     escapeHtml,
+    getGroupDescription(group) {
+      const progress = progressMap[group.id];
+      return "\u5f85\u80cc " + progress.remainingCount + " \u00b7 \u5df2\u80cc " + progress.masteredCount + " / " + progress.totalCount + " \u00b7 \u9519\u8bcd " + progress.wrongCount;
+    },
+    isGroupSelectable(group) {
+      return isGroupReadyForPractice(group, progressMap[group.id]);
+    },
     onToggle(groupId, checked) {
       if (checked) {
         pendingGroupSelection.add(groupId);
@@ -366,9 +404,10 @@ function renderGroupSelector() {
 }
 
 function selectAllGroupsForPendingMode() {
+  const progressMap = getGroupProgressMapForMode(pendingGroupMode);
   pendingGroupSelection = new Set(
     getGroups(pendingGroupMode)
-      .filter((group) => group.entries.length > 0)
+      .filter((group) => isGroupReadyForPractice(group, progressMap[group.id]))
       .map((group) => group.id)
   );
   setGroupSelectorStatus();
@@ -384,6 +423,9 @@ function clearPendingGroupSelection() {
 function confirmGroupSelection() {
   const selectedGroupIds = Array.from(pendingGroupSelection);
   const entries = collectEntriesFromGroups(pendingGroupMode, selectedGroupIds);
+  const persistedMasteredKeys = getMasteredProgressKeys(wordProgress, pendingGroupMode, entries);
+  const persistedWrongKeys = getWrongProgressKeys(wordProgress, pendingGroupMode, entries);
+  const remainingEntries = getRemainingPracticeEntriesForPractice(entries, persistedMasteredKeys);
 
   if (selectedGroupIds.length === 0) {
     setGroupSelectorStatus("Please select at least one group that contains words.", "error");
@@ -391,9 +433,9 @@ function confirmGroupSelection() {
     return;
   }
 
-  if (!hasSufficientQuizEntriesFromQuiz(entries)) {
-    setGroupSelectorStatus("Selected groups need at least 2 entries with 2 different meanings.", "error");
-    showToast("Selected groups need at least 2 entries with 2 different meanings.", "error");
+  if (!hasSufficientQuizEntriesFromQuiz(remainingEntries)) {
+    setGroupSelectorStatus("\u6240\u9009\u5206\u7ec4\u91cc\u672a\u80cc\u5355\u8bcd\u4e0d\u8db3 2 \u4e2a\uff0c\u6216\u91ca\u4e49\u4e0d\u8db3\u4ee5\u51fa\u9898\u3002", "error");
+    showToast("\u6240\u9009\u5206\u7ec4\u91cc\u672a\u80cc\u5355\u8bcd\u4e0d\u8db3 2 \u4e2a\uff0c\u8bf7\u5148\u6dfb\u52a0\u65b0\u8bcd\u6216\u66f4\u6362\u5206\u7ec4\u3002", "error");
     return;
   }
 
@@ -402,6 +444,8 @@ function confirmGroupSelection() {
     selectedGroupIds,
     entries,
     shuffleEntries: shuffleArrayFromQuiz,
+    masteredEntryKeys: persistedMasteredKeys,
+    carryOverWrongKeys: persistedWrongKeys,
   }));
   setLibraryActionsDisabled(true);
   setGroupSelectorStatus();
@@ -482,6 +526,7 @@ function nextQuestion() {
       handleOptionClick(button, isCorrect);
     },
   });
+  syncQuizDeleteButtonState();
 }
 
 function handleOptionClick(button, isCorrect) {
@@ -490,6 +535,7 @@ function handleOptionClick(button, isCorrect) {
   }
 
   transitionLock = true;
+  syncQuizDeleteButtonState();
   const optionButtons = Array.from(document.querySelectorAll(".option-btn"));
   optionButtons.forEach((btn) => {
     btn.disabled = true;
@@ -508,6 +554,8 @@ function handleOptionClick(button, isCorrect) {
     carryOverWrongKeys,
     getEntryKey: getEntryKeyFromQuiz,
   });
+  wordProgress = updateWordProgress(wordProgress, currentMode, entry, isCorrect);
+  persistLibraryState({ skipRefresh: true });
 
   if (isCorrect) {
     button.classList.add("correct");
@@ -529,6 +577,7 @@ function handleOptionClick(button, isCorrect) {
 
   window.setTimeout(() => {
     transitionLock = false;
+    syncQuizDeleteButtonState();
     if (!sessionActive) {
       return;
     }
@@ -593,6 +642,7 @@ function renderRoundProgress() {
 function showRoundCompletion() {
   roundCelebrationVisible = true;
   transitionLock = true;
+  syncQuizDeleteButtonState();
   renderRoundProgress();
 
   const accuracy = answeredCountValue === 0
@@ -636,6 +686,7 @@ function continueNextRound() {
   }
 
   roundCelebrationVisible = false;
+  syncQuizDeleteButtonState();
   hideRoundCelebrationUI({
     overlayElement: roundCompleteOverlay,
     sceneElement: celebrationScene,
@@ -651,6 +702,7 @@ function continueNextRound() {
 
 function finishPracticeLoop() {
   roundCelebrationVisible = false;
+  syncQuizDeleteButtonState();
   playFinishPracticeSound();
   exitQuiz();
 }
@@ -658,6 +710,33 @@ function finishPracticeLoop() {
 function getModeLabel(mode) { return wordBanks[mode].label; }
 
 function getActiveGroup(mode) { return findGroupInGroups(getGroups(mode), activeLibraryGroupIds[mode]); }
+
+function formatDuplicateEntriesMessage(mode, duplicateEntries) {
+  if (!Array.isArray(duplicateEntries) || duplicateEntries.length === 0) {
+    return "";
+  }
+
+  if (mode === "english") {
+    const uniqueWords = Array.from(new Set(
+      duplicateEntries
+        .map((entry) => String(entry?.word || "").trim())
+        .filter(Boolean)
+    ));
+
+    if (uniqueWords.length === 0) {
+      return "当前分组里已有重复英文单词。";
+    }
+
+    const preview = uniqueWords.slice(0, 5).join("、");
+    if (uniqueWords.length > 5) {
+      return `重复英文单词：${preview} 等 ${uniqueWords.length} 个`;
+    }
+
+    return `重复英文单词：${preview}`;
+  }
+
+  return "这些词条已存在于当前分组。";
+}
 
 function createGroupFromInput(mode) {
   if (blockIfSessionActive("editing the library")) {
@@ -707,13 +786,23 @@ function addManualEntries(mode) {
     return;
   }
 
-  const addedCount = addEntriesToGroup(getGroups(mode), group.id, entries);
+  const { addedCount, duplicateEntries } = addEntriesToGroup(getGroups(mode), group.id, entries, {
+    matchWordOnly: mode === "english",
+  });
+  const duplicateMessage = formatDuplicateEntriesMessage(mode, duplicateEntries);
 
-  input.value = "";
-  persistLibraryState();
+  if (addedCount > 0) {
+    input.value = "";
+    persistLibraryState();
+  }
 
-  if (addedCount === 0) {
-    showToast("These entries already exist in the current group.", "error");
+  if (addedCount === 0 && duplicateMessage) {
+    showToast(duplicateMessage, "error");
+    return;
+  }
+
+  if (duplicateMessage) {
+    showToast(`已添加 ${addedCount} 个；${duplicateMessage}`, "error");
     return;
   }
 
@@ -727,6 +816,7 @@ function clearWords() {
 
   resetBank("english");
   resetBank("russian");
+  wordProgress = createEmptyWordProgress();
   wrongRecords.clear();
   applySessionState(createClearedPracticeState());
   activeLibraryGroupIds.english = "";
@@ -738,12 +828,14 @@ function clearWords() {
 function renderWordsView() { renderWordColumn("english", englishWordsList, englishWordsEmpty); renderWordColumn("russian", russianWordsList, russianWordsEmpty); }
 
 function renderWordColumn(mode, listElement, emptyElement) {
+  emptyElement.textContent = getWordsEmptyText(mode);
   renderWordColumnUI({
-    groups: getGroups(mode),
+    groups: getFilteredGroupsForWordsView(mode),
     locale: wordBanks[mode].locale,
     listElement,
     emptyElement,
     escapeHtml,
+    groupProgressMap: getGroupProgressMapForMode(mode),
     onDeleteEntry(groupId, entryId) {
       deleteWordEntry(mode, groupId, entryId);
     },
@@ -773,6 +865,76 @@ function deleteWordEntry(mode, groupId, entryId) {
   wrongRecords.delete(getWrongRecordKeyFromQuiz(entry));
   persistLibraryState();
   showToast("Deleted 1 " + getModeLabel(mode) + " entry.", "success");
+}
+
+function deleteCurrentQuestionEntry() {
+  if (!sessionActive || transitionLock || roundCelebrationVisible || !currentQuestionEntry) {
+    return;
+  }
+
+  const entry = currentQuestionEntry;
+  const confirmed = window.confirm(
+    "\u786e\u5b9a\u8981\u4ece\u8bcd\u5e93\u5220\u9664\u8fd9\u4e2a\u5355\u8bcd\u5417\uff1f\n\n" +
+    entry.word +
+    " - " +
+    entry.meaning
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  const removedCount = removeMatchingLibraryEntries(currentMode, entry);
+  if (removedCount === 0) {
+    showToast("\u8fd9\u4e2a\u5355\u8bcd\u5df2\u4e0d\u5728\u8bcd\u5e93\u91cc\u4e86\u3002", "error");
+    return;
+  }
+
+  const entryKey = getEntryKeyFromQuiz(entry);
+  const nextPracticeEntries = removeEntryKeyFromEntries(practiceEntries, entryKey);
+  const nextCurrentQuizEntries = removeEntryKeyFromEntries(currentQuizEntries, entryKey);
+  const nextCurrentRoundPendingEntries = removeEntryKeyFromEntries(currentRoundPendingEntries, entryKey);
+  const nextMasteredEntryKeys = new Set(masteredEntryKeys);
+  const nextCarryOverWrongKeys = new Set(carryOverWrongKeys);
+  nextMasteredEntryKeys.delete(entryKey);
+  nextCarryOverWrongKeys.delete(entryKey);
+  wrongRecords.delete(getWrongRecordKeyFromQuiz(entry));
+
+  const canContinueCurrentRound =
+    nextCurrentRoundPendingEntries.length > 0 &&
+    hasSufficientQuizEntriesFromQuiz(nextCurrentQuizEntries);
+
+  applySessionState({
+    practiceEntries: nextPracticeEntries,
+    currentQuizEntries: canContinueCurrentRound ? nextCurrentQuizEntries : [],
+    currentRoundPendingEntries: canContinueCurrentRound ? nextCurrentRoundPendingEntries : [],
+    currentQuestionEntry: null,
+    currentRoundSize: canContinueCurrentRound ? nextCurrentQuizEntries.length : answeredCountValue,
+    lastQuestionKey: "",
+    masteredEntryKeys: nextMasteredEntryKeys,
+    carryOverWrongKeys: nextCarryOverWrongKeys,
+  });
+  persistLibraryState({ skipRefresh: true });
+
+  if (canContinueCurrentRound) {
+    showToast("\u5df2\u4ece\u8bcd\u5e93\u5220\u9664\u5f53\u524d\u5355\u8bcd\u3002", "success");
+    nextQuestion();
+    return;
+  }
+
+  if (answeredCountValue === 0 && prepareNextRound()) {
+    showToast("\u5df2\u5220\u9664\u5f53\u524d\u5355\u8bcd\uff0c\u5df2\u81ea\u52a8\u91cd\u65b0\u751f\u6210\u9898\u76ee\u3002", "success");
+    nextQuestion();
+    return;
+  }
+
+  if (hasNextRoundAvailableForPractice(practiceEntries, masteredEntryKeys)) {
+    showToast("\u5df2\u5220\u9664\u5f53\u524d\u5355\u8bcd\uff0c\u8fd9\u4e00\u8f6e\u6d4b\u8bd5\u5df2\u81ea\u52a8\u7ed3\u675f\u3002", "success");
+    showRoundCompletion();
+    return;
+  }
+
+  showToast("\u5df2\u5220\u9664\u5f53\u524d\u5355\u8bcd\uff0c\u5269\u4f59\u5355\u8bcd\u4e0d\u8db3\u4ee5\u7ee7\u7eed\u6d4b\u8bd5\u3002", "success");
+  finishPracticeLoop();
 }
 
 function deleteGroup(mode, groupId) {
@@ -808,6 +970,10 @@ function loadSavedWords() {
 
     wordBanks.english.groups = groupsByMode.english;
     wordBanks.russian.groups = groupsByMode.russian;
+    wordProgress = pruneWordProgress(
+      normalizeWordProgress(groupsByMode.progress),
+      { english: groupsByMode.english, russian: groupsByMode.russian }
+    );
   } catch (error) {
     console.warn("Failed to load word library:", error);
   } finally {
@@ -836,12 +1002,32 @@ function renderGroupPreview(mode, container) {
     container,
     renderPreview: true,
     escapeHtml,
+    groupProgressMap: getGroupProgressMapForMode(mode),
     onSelectGroup(groupId) {
       setActiveLibraryGroup(mode, groupId);
     },
     onDeleteGroup(groupId) {
       deleteGroup(mode, groupId);
     },
+  });
+}
+
+function renderGroupProgressDetails(mode) {
+  const group = getActiveGroup(mode);
+  const summary = buildGroupProgressSummary(group, wordProgress, mode);
+  const isEnglish = mode === "english";
+
+  renderGroupProgressPanelUI({
+    group,
+    summary,
+    bodyElement: isEnglish ? englishProgressBody : russianProgressBody,
+    emptyElement: isEnglish ? englishProgressEmpty : russianProgressEmpty,
+    statsElement: isEnglish ? englishProgressStats : russianProgressStats,
+    masteredListElement: isEnglish ? englishMasteredList : russianMasteredList,
+    masteredEmptyElement: isEnglish ? englishMasteredEmpty : russianMasteredEmpty,
+    wrongListElement: isEnglish ? englishWrongProgressList : russianWrongProgressList,
+    wrongEmptyElement: isEnglish ? englishWrongProgressEmpty : russianWrongProgressEmpty,
+    escapeHtml,
   });
 }
 
@@ -876,6 +1062,100 @@ function collectEntriesFromGroups(mode, groupIds) { return collectEntriesFromGro
 
 function getGroups(mode) { return wordBanks[mode].groups; }
 
+function getGroupProgressMapForMode(mode) {
+  return buildGroupProgressMap(getGroups(mode), wordProgress, mode);
+}
+
+function isGroupReadyForPractice(group, progress) {
+  return group.entries.length > 0 && Boolean(progress) && progress.remainingCount > 0;
+}
+
+function getFilteredGroupsForWordsView(mode) {
+  const groups = getGroups(mode);
+  if (!wordsSearchQuery) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => {
+      const groupNameMatches = normalizeSearchQuery(group.name).includes(wordsSearchQuery);
+      const entries = groupNameMatches
+        ? group.entries.slice()
+        : group.entries.filter((entry) => matchesWordsSearch(group, entry));
+
+      if (entries.length === 0) {
+        return null;
+      }
+
+      return {
+        ...group,
+        entries,
+      };
+    })
+    .filter(Boolean);
+}
+
+function matchesWordsSearch(group, entry) {
+  return (
+    normalizeSearchQuery(group.name).includes(wordsSearchQuery) ||
+    normalizeSearchQuery(entry.word).includes(wordsSearchQuery) ||
+    normalizeSearchQuery(entry.meaning).includes(wordsSearchQuery)
+  );
+}
+
+function getWordsEmptyText(mode) {
+  if (wordsSearchQuery) {
+    return getModeLabel(mode) + "\u8bcd\u5e93\u91cc\u6ca1\u6709\u627e\u5230\u5339\u914d\u7684\u5355\u8bcd\u3002";
+  }
+
+  return mode === "english"
+    ? "\u82f1\u8bed\u8bcd\u5e93\u8fd8\u662f\u7a7a\u7684\u3002"
+    : "\u4fc4\u8bed\u8bcd\u5e93\u8fd8\u662f\u7a7a\u7684\u3002";
+}
+
+function updateWordsSearchQuery(value) {
+  wordsSearchQuery = normalizeSearchQuery(value);
+  renderWordsView();
+}
+
+function normalizeSearchQuery(value) {
+  return String(value || "").trim().toLocaleLowerCase();
+}
+
+function syncQuizDeleteButtonState() {
+  deleteCurrentWordBtn.disabled =
+    !sessionActive ||
+    transitionLock ||
+    roundCelebrationVisible ||
+    !currentQuestionEntry;
+}
+
+function removeMatchingLibraryEntries(mode, targetEntry) {
+  let removedCount = 0;
+  const targetKey = getEntryKeyFromQuiz(targetEntry);
+
+  getGroups(mode).forEach((group) => {
+    const nextEntries = [];
+
+    group.entries.forEach((entry) => {
+      if (getEntryKeyFromQuiz(entry) === targetKey) {
+        removedCount += 1;
+        return;
+      }
+
+      nextEntries.push(entry);
+    });
+
+    group.entries = nextEntries;
+  });
+
+  return removedCount;
+}
+
+function removeEntryKeyFromEntries(entries, entryKey) {
+  return entries.filter((entry) => getEntryKeyFromQuiz(entry) !== entryKey);
+}
+
 function setActiveLibraryGroup(mode, groupId) { activeLibraryGroupIds[mode] = groupId; refreshAllDisplays(); }
 
 function ensureValidActiveGroup(mode) { activeLibraryGroupIds[mode] = ensureValidActiveGroupId(getGroups(mode), activeLibraryGroupIds[mode]); }
@@ -888,6 +1168,10 @@ function replaceWordLibrary(payload) {
 
   wordBanks.english.groups = payload.english.map(cloneGroupFromLibrary);
   wordBanks.russian.groups = payload.russian.map(cloneGroupFromLibrary);
+  wordProgress = pruneWordProgress(
+    normalizeWordProgress(payload.progress),
+    { english: wordBanks.english.groups, russian: wordBanks.russian.groups }
+  );
 
   ensureValidActiveGroup("english");
   ensureValidActiveGroup("russian");
@@ -981,7 +1265,7 @@ function buildCurrentLibraryPayload() {
   return buildWordLibraryPayloadFromStorage({
     english: getGroups("english"),
     russian: getGroups("russian"),
-  });
+  }, wordProgress);
 }
 
 async function exportWordsToFile() {
@@ -998,6 +1282,19 @@ function blockIfSessionActive(action) { if (!sessionActive) return false; showTo
 
 function updateWordFileContext(context) { activeWordFileHandle = context.fileHandle ?? null; activeWordFilePath = context.filePath || ""; }
 
-function persistLibraryState() { saveWordBanksToStorage(STORAGE_KEY, { english: getGroups("english"), russian: getGroups("russian") }); refreshAllDisplays(); }
+function persistLibraryState(options = {}) {
+  wordProgress = pruneWordProgress(wordProgress, {
+    english: getGroups("english"),
+    russian: getGroups("russian"),
+  });
+  saveWordBanksToStorage(STORAGE_KEY, {
+    english: getGroups("english"),
+    russian: getGroups("russian"),
+  }, wordProgress);
+
+  if (!options.skipRefresh) {
+    refreshAllDisplays();
+  }
+}
 
 

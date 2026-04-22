@@ -13,8 +13,58 @@ function createWindowsManager({
   let mainWindow = null
   let floatingNotesWindow = null
   let floatingNotesPinned = true
+  let mainWindowHiddenForFloatingNotes = false
+  let allowMainWindowToClose = false
+
+  app.on('before-quit', () => {
+    allowMainWindowToClose = true
+  })
+
+  function hasFloatingNotesWindow() {
+    return Boolean(floatingNotesWindow && !floatingNotesWindow.isDestroyed())
+  }
+
+  function restoreMainWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return null
+    }
+
+    mainWindowHiddenForFloatingNotes = false
+    mainWindow.setSkipTaskbar(false)
+
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore()
+    }
+
+    mainWindow.show()
+    mainWindow.focus()
+    return mainWindow
+  }
+
+  function hideMainWindowForFloatingNotes() {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return false
+    }
+
+    mainWindowHiddenForFloatingNotes = true
+    mainWindow.setSkipTaskbar(true)
+    mainWindow.hide()
+    return true
+  }
+
+  function closeHiddenMainWindowIfNeeded() {
+    if (!mainWindowHiddenForFloatingNotes || !mainWindow || mainWindow.isDestroyed()) {
+      return
+    }
+
+    const windowToClose = mainWindow
+    mainWindowHiddenForFloatingNotes = false
+    mainWindow = null
+    windowToClose.destroy()
+  }
 
   function createMainWindow() {
+    mainWindowHiddenForFloatingNotes = false
     mainWindow = new BrowserWindow({
       width: 1440,
       height: 920,
@@ -41,6 +91,14 @@ function createWindowsManager({
       relativePath: 'index.html',
     })
 
+    mainWindow.once('ready-to-show', () => {
+      console.log('Main window ready-to-show.')
+    })
+
+    mainWindow.on('show', () => {
+      console.log('Main window show event.')
+    })
+
     mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
       console.error('Failed to load main window.', {
         errorCode,
@@ -53,11 +111,36 @@ function createWindowsManager({
       console.error('Main window render process exited.', details)
     })
 
+    mainWindow.webContents.on('did-finish-load', () => {
+      console.log('Main window did-finish-load.', mainWindow?.webContents?.getURL?.() || '')
+    })
+
+    mainWindow.webContents.on('dom-ready', () => {
+      console.log('Main window dom-ready.')
+    })
+
     mainWindow.on('page-title-updated', (event) => {
       event.preventDefault()
       if (!mainWindow?.isDestroyed()) {
         mainWindow.setTitle('SHANLIC LIFE TRACKER SYSTEM')
       }
+    })
+
+    mainWindow.on('close', (event) => {
+      if (allowMainWindowToClose || !hasFloatingNotesWindow()) {
+        return
+      }
+
+      event.preventDefault()
+      if (hideMainWindowForFloatingNotes()) {
+        focusFloatingNotesWindow()
+      }
+    })
+
+    mainWindow.on('closed', () => {
+      console.log('Main window closed event.')
+      mainWindow = null
+      mainWindowHiddenForFloatingNotes = false
     })
 
     if (!app.isPackaged) {
@@ -72,7 +155,35 @@ function createWindowsManager({
       return
     }
 
-    floatingNotesWindow.setAlwaysOnTop(Boolean(enabled), enabled ? 'floating' : 'normal')
+    const pinned = Boolean(enabled)
+
+    // Use a stronger top-most level so the notes window can stay above browsers
+    // after the main app window is hidden.
+    floatingNotesWindow.setAlwaysOnTop(pinned, pinned ? 'screen-saver' : 'normal')
+
+    if (typeof floatingNotesWindow.setVisibleOnAllWorkspaces === 'function') {
+      try {
+        floatingNotesWindow.setVisibleOnAllWorkspaces(pinned, { visibleOnFullScreen: pinned })
+      } catch {}
+    }
+
+    if (floatingNotesWindow.isMinimized()) {
+      floatingNotesWindow.restore()
+    }
+
+    floatingNotesWindow.show()
+
+    if (pinned) {
+      if (typeof floatingNotesWindow.moveTop === 'function') {
+        try {
+          floatingNotesWindow.moveTop()
+        } catch {}
+      }
+
+      try {
+        floatingNotesWindow.focus()
+      } catch {}
+    }
   }
 
   function focusFloatingNotesWindow(noteId) {
@@ -80,7 +191,18 @@ function createWindowsManager({
       return false
     }
 
+    if (floatingNotesWindow.isMinimized()) {
+      floatingNotesWindow.restore()
+    }
+
     floatingNotesWindow.show()
+
+    if (floatingNotesPinned && typeof floatingNotesWindow.moveTop === 'function') {
+      try {
+        floatingNotesWindow.moveTop()
+      } catch {}
+    }
+
     floatingNotesWindow.focus()
 
     if (noteId !== undefined && noteId !== null) {
@@ -156,6 +278,7 @@ function createWindowsManager({
 
     floatingNotesWindow.on('closed', () => {
       floatingNotesWindow = null
+      closeHiddenMainWindowIfNeeded()
     })
 
     return floatingNotesWindow
@@ -177,6 +300,7 @@ function createWindowsManager({
 
   return {
     createMainWindow,
+    restoreMainWindow,
     openFloatingNotesWindow,
     getFloatingNotesPinState,
     setFloatingNotesPinState,

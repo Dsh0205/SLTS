@@ -1,5 +1,7 @@
+import { getEntryIdentityKey } from "./library.js";
+
 export function getEntryKey(entry) {
-  return entry.word + "\u0000" + entry.meaning;
+  return getEntryIdentityKey(entry);
 }
 
 export function getWrongRecordKey(entry) {

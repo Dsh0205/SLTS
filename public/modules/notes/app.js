@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const editBtn = document.getElementById('note-menu-edit-btn');
   const importBtn = document.getElementById('note-menu-import-btn');
   const exportBtn = document.getElementById('note-menu-export-btn');
+  const exportMarkdownBtn = document.getElementById('note-menu-export-md-btn');
 
   const editorView = document.getElementById('editor-view');
   const editorViewTitle = document.getElementById('editor-view-title');
@@ -120,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnWidescreen = document.getElementById('btn-widescreen');
 
   const expandedNoteIds = new Set();
-  const collapsedNoteImageKeys = new Set();
+  const expandedNoteImageKeys = new Set();
   const handleMainEditorChange = () => handleDraftInput('main');
   let toastTimer = 0;
   let activeTocHeadingId = '';
@@ -263,6 +264,24 @@ document.addEventListener('DOMContentLoaded', () => {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
+  });
+
+  exportMarkdownBtn?.addEventListener('click', () => {
+    closeNoteMenu();
+    const note = resolveActiveNoteForTextExport();
+    if (!note) return;
+
+    const fileName = `${buildTextExportFileName(note.title)}.md`;
+    const blob = new Blob([note.content || ''], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    showToast(`已导出 Markdown：${fileName}`);
   });
 
   importBtn?.addEventListener('click', async () => {
@@ -555,6 +574,10 @@ document.addEventListener('DOMContentLoaded', () => {
       exportBtn.disabled = !activeNote;
     }
 
+    if (exportMarkdownBtn) {
+      exportMarkdownBtn.disabled = !activeNote;
+    }
+
     if (topSideEditorBtn) {
       topSideEditorBtn.disabled = storageProtectionActive;
     }
@@ -564,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
       topDesktopBtn.disabled = storageProtectionActive || !desktopBridge?.isElectron;
     }
 
-    const visibleButtons = [saveMenuBtn, editBtn, importBtn, exportBtn, topSideEditorBtn, topDesktopBtn]
+    const visibleButtons = [saveMenuBtn, editBtn, importBtn, exportBtn, exportMarkdownBtn, topSideEditorBtn, topDesktopBtn]
       .filter((button) => button && !button.hidden);
     const hasEnabledAction = visibleButtons.some((button) => !button.disabled);
 
@@ -711,14 +734,98 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleButton.className = 'note-inline-toggle';
       toggleButton.addEventListener('click', () => {
         const collapsed = !wrapper.classList.contains('is-collapsed');
-        updateCollapsedNoteImageState(imageKey, collapsed);
+        updateExpandedNoteImageState(imageKey, !collapsed);
         applyNoteImageCollapsedState(wrapper, collapsed);
       });
 
       meta.append(name, toggleButton);
       wrapper.append(previewButton, meta);
-      applyNoteImageCollapsedState(wrapper, collapsedNoteImageKeys.has(imageKey));
+      applyNoteImageCollapsedState(wrapper, !expandedNoteImageKeys.has(imageKey));
     });
+  }
+
+  function enhanceRenderedCodeBlocks() {
+    const renderedCodeBlocks = Array.from(viewContent.querySelectorAll('pre'))
+      .filter((block) => !block.parentElement?.classList.contains('note-code-block'));
+
+    renderedCodeBlocks.forEach((block) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'note-code-block';
+
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'note-code-copy-btn';
+      copyButton.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i><span>复制</span>';
+      copyButton.setAttribute('aria-label', '复制代码块');
+      copyButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const codeElement = block.querySelector('code');
+        const codeText = codeElement?.textContent ?? block.textContent ?? '';
+        if (!codeText.trim()) {
+          showToast('当前代码块为空');
+          return;
+        }
+
+        try {
+          await copyTextToClipboard(codeText);
+          setCodeCopyButtonState(copyButton, true);
+          showToast('已复制Ciallo～(∠・ω )⌒☆');
+        } catch {
+          setCodeCopyButtonState(copyButton, false);
+          showToast('复制失败，请稍后重试');
+        }
+      });
+
+      block.replaceWith(wrapper);
+      wrapper.append(copyButton, block);
+    });
+  }
+
+  function setCodeCopyButtonState(button, copied) {
+    if (!(button instanceof HTMLButtonElement)) return;
+
+    window.clearTimeout(Number(button.dataset.resetTimerId || 0));
+    button.classList.toggle('is-copied', copied);
+    button.innerHTML = copied
+      ? '<i class="fas fa-check" aria-hidden="true"></i><span>已复制</span>'
+      : '<i class="fas fa-copy" aria-hidden="true"></i><span>复制</span>';
+
+    if (!copied) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      button.classList.remove('is-copied');
+      button.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i><span>复制</span>';
+      delete button.dataset.resetTimerId;
+    }, 1600);
+    button.dataset.resetTimerId = String(timerId);
+  }
+
+  async function copyTextToClipboard(text) {
+    const normalizedText = String(text ?? '');
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(normalizedText);
+      return;
+    }
+
+    const helper = document.createElement('textarea');
+    helper.value = normalizedText;
+    helper.setAttribute('readonly', 'readonly');
+    helper.style.position = 'fixed';
+    helper.style.opacity = '0';
+    helper.style.pointerEvents = 'none';
+    document.body.appendChild(helper);
+    helper.focus({ preventScroll: true });
+    helper.select();
+
+    const copied = document.execCommand('copy');
+    document.body.removeChild(helper);
+    if (!copied) {
+      throw new Error('copy failed');
+    }
   }
 
   function applyNoteImageCollapsedState(wrapper, collapsed) {
@@ -733,14 +840,14 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   }
 
-  function updateCollapsedNoteImageState(imageKey, collapsed) {
+  function updateExpandedNoteImageState(imageKey, expanded) {
     if (!imageKey) return;
-    if (collapsed) {
-      collapsedNoteImageKeys.add(imageKey);
+    if (expanded) {
+      expandedNoteImageKeys.add(imageKey);
       return;
     }
 
-    collapsedNoteImageKeys.delete(imageKey);
+    expandedNoteImageKeys.delete(imageKey);
   }
 
   function openNoteImageLightbox(source, imageName, altText = imageName) {
@@ -931,6 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
     viewTitle.textContent = note.title || '无标题笔记';
     viewDate.textContent = `最后修改：${note.lastModified}`;
     viewContent.innerHTML = marked.parse(note.content || '');
+    enhanceRenderedCodeBlocks();
     enhanceRenderedNoteImages(note);
     if (viewBody) {
       viewBody.scrollTop = 0;
@@ -1482,6 +1590,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function cloneNotesSnapshot(list = notes) {
     return hydrateNotesFromStorage(list);
+  }
+
+  function resolveActiveNoteForTextExport() {
+    if (!activeNoteId) {
+      return null;
+    }
+
+    if (draftNoteId === activeNoteId && hasUnsavedChanges()) {
+      const savedNote = saveCurrentNote({ announce: false });
+      if (!savedNote) {
+        showToast('当前笔记保存失败，暂时无法导出');
+        return null;
+      }
+
+      return savedNote;
+    }
+
+    const note = findNoteById(activeNoteId);
+    if (!note) {
+      showToast('当前笔记不存在，无法导出');
+      return null;
+    }
+
+    return note;
+  }
+
+  function buildTextExportFileName(title) {
+    const normalized = String(title || '')
+      .trim()
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return normalized || '无标题笔记';
   }
 
   async function exportActiveNoteAsJpg() {

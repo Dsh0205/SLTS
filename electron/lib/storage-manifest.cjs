@@ -37,7 +37,7 @@ const STORAGE_MANIFEST = Object.freeze([
   {
     moduleId: 'hobby',
     pathSuffix: '/modules/hobby/index.html',
-    keys: ['hobby-tracker-monthly-v1'],
+    keys: ['usage-checkin-heatmap-v1', 'focus-timer-state-v1'],
   },
 ])
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ModuleDefinition } from '../lib/modules'
 
 const props = defineProps<{
@@ -11,7 +11,9 @@ const emit = defineEmits<{
 }>()
 
 const frameKey = ref(0)
-const frameSrc = computed(() => props.module.publicEntry)
+const frameRef = ref<HTMLIFrameElement | null>(null)
+const frameLoadError = ref('')
+const frameSrc = computed(() => resolveFrameSrc(props.module.publicEntry))
 const isWarmWorkspace = computed(() => props.module.key === 'hobby')
 const workspaceStyle = computed(() => ({
   '--module-color': props.module.color,
@@ -23,6 +25,44 @@ function handleKeydown(event: KeyboardEvent) {
     emit('back')
   }
 }
+
+function resolveFrameSrc(publicEntry: string) {
+  const entry = String(publicEntry || '').replace(/^\.?\//, '')
+  const baseUrl = new URL(window.location.href.split('#')[0] || window.location.href)
+  return new URL(`./${entry}`, baseUrl).toString()
+}
+
+function reloadFrame() {
+  frameLoadError.value = ''
+  frameKey.value += 1
+}
+
+function handleFrameLoad() {
+  const locationHref = readFrameLocationHref()
+  if (!locationHref) {
+    frameLoadError.value = ''
+    return
+  }
+
+  if (locationHref === 'about:blank' || locationHref.startsWith('chrome-error://')) {
+    frameLoadError.value = '模块页面没有成功加载，请重新打开一次。'
+    return
+  }
+
+  frameLoadError.value = ''
+}
+
+function readFrameLocationHref() {
+  try {
+    return frameRef.value?.contentWindow?.location?.href || ''
+  } catch {
+    return ''
+  }
+}
+
+watch(() => props.module.key, () => {
+  reloadFrame()
+}, { immediate: true })
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
@@ -47,11 +87,17 @@ onBeforeUnmount(() => {
       </svg>
     </button>
     <iframe
+      ref="frameRef"
       :key="frameKey"
       class="workspace-frame"
       :src="frameSrc"
       :title="module.title"
+      @load="handleFrameLoad"
     ></iframe>
+    <div v-if="frameLoadError" class="workspace-error-banner">
+      <span>{{ frameLoadError }}</span>
+      <button class="workspace-error-action" type="button" @click="reloadFrame">重新打开</button>
+    </div>
   </section>
 </template>
 
@@ -130,6 +176,45 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--module-color-soft) 56%, #fff6ea);
 }
 
+.workspace-error-banner {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(9, 15, 27, 0.88);
+  color: #f5f7ff;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+}
+
+.workspace-error-banner span {
+  flex: 1;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.workspace-error-action {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.workspace-error-action:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 @media (max-width: 640px) {
   .back-button {
     top: 14px;
@@ -142,6 +227,15 @@ onBeforeUnmount(() => {
   .back-button-icon {
     width: 17px;
     height: 17px;
+  }
+
+  .workspace-error-banner {
+    right: 14px;
+    bottom: 14px;
+    left: 14px;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

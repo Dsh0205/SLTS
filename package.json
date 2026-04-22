@@ -1,6 +1,6 @@
 {
   "name": "shanlic-life-tracker-system",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "private": true,
   "main": "electron/main.cjs",
   "type": "module",
@@ -48,6 +48,10 @@
     "appId": "com.shanlic.life-tracker",
     "productName": "SHANLIC LIFE TRACKER SYSTEM",
     "icon": "electron/assets/icon-256.png",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",

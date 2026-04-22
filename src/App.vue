@@ -15,6 +15,7 @@ function openModule(moduleKey: ModuleKey) {
     return
   }
 
+  activeModuleKey.value = moduleKey
   window.location.hash = `#/module/${moduleKey}`
 }
 

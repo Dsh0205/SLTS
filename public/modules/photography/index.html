@@ -12,6 +12,16 @@
     <section id="mapView" class="map-view module-pop-surface delay-1">
       <div class="map-stage map-stage--large module-pop-surface delay-2">
         <div class="map-stage-glow" aria-hidden="true"></div>
+        <div class="map-stage-noise" aria-hidden="true"></div>
+        <div class="map-stage-copy">
+          <p class="map-kicker">SHANLIC PHOTO ATLAS</p>
+          <h1>行万里路</h1>
+        </div>
+        <div id="mapStageRail" class="map-stage-rail" hidden>
+          <article class="map-rail-card map-rail-card--feature">
+            <strong id="mapActiveProvinceName"></strong>
+          </article>
+        </div>
         <svg
           id="chinaMap"
           class="china-map china-map--large module-pop-surface module-pop-svg delay-3"
@@ -25,60 +35,77 @@
             </filter>
           </defs>
 
-          <g class="map-grid" aria-hidden="true">
-            <path d="M80 110 L920 110"></path>
-            <path d="M70 220 L930 220"></path>
-            <path d="M60 340 L940 340"></path>
-            <path d="M70 470 L930 470"></path>
-            <path d="M90 600 L910 600"></path>
-            <path d="M130 60 L92 640"></path>
-            <path d="M300 58 L258 642"></path>
-            <path d="M500 52 L492 648"></path>
-            <path d="M700 58 L742 640"></path>
-            <path d="M870 70 L910 632"></path>
-          </g>
+          <g id="mapViewport" class="map-viewport">
+            <g class="map-grid" aria-hidden="true">
+              <path d="M80 110 L920 110"></path>
+              <path d="M70 220 L930 220"></path>
+              <path d="M60 340 L940 340"></path>
+              <path d="M70 470 L930 470"></path>
+              <path d="M90 600 L910 600"></path>
+              <path d="M130 60 L92 640"></path>
+              <path d="M300 58 L258 642"></path>
+              <path d="M500 52 L492 648"></path>
+              <path d="M700 58 L742 640"></path>
+              <path d="M870 70 L910 632"></path>
+            </g>
 
-          <g id="provinceShapeLayer"></g>
-          <g id="provinceSelectionLayer"></g>
-          <g id="provinceLabelLayer"></g>
-          <g id="anchorLayer"></g>
+            <g id="provinceShapeLayer"></g>
+            <g id="provinceSelectionLayer"></g>
+            <g id="provinceLabelLayer"></g>
+            <g id="anchorLayer"></g>
+          </g>
         </svg>
       </div>
 
-      <div id="provinceFocusBackdrop" class="province-focus-backdrop" hidden>
-        <section class="province-focus-card" aria-label="省份摄影浮层">
-          <button id="closeProvinceFocusBtn" class="province-focus-close" type="button" aria-label="关闭省份浮层">×</button>
-          <div class="province-focus-meta">
-            <strong id="focusProvinceName">省份</strong>
-            <span id="focusProvinceHint">再次点击放大的省份地图即可进入相册，也可以先点“手动放置”创建锚点。</span>
-            <div class="province-focus-actions">
-              <button id="focusEnterGalleryBtn" class="province-focus-btn province-focus-btn--secondary" type="button">进入相册</button>
-              <button id="focusCreateAnchorBtn" class="province-focus-btn" type="button">手动放置</button>
+      <aside id="provinceFocusBackdrop" class="province-focus-backdrop" aria-hidden="true">
+        <section class="province-focus-card" aria-label="省份摄影侧边面板">
+          <div class="province-focus-drag" aria-hidden="true"></div>
+          <div class="province-focus-head">
+            <div class="province-focus-meta">
+              <p class="province-focus-kicker">PHOTO FIELD ARCHIVE</p>
+              <strong id="focusProvinceName">省份</strong>
+              <div class="province-focus-chips">
+                <span id="focusProvinceAlbumCount" class="province-focus-chip">0 相册</span>
+              </div>
+              <div class="province-focus-actions">
+                <button id="focusEnterGalleryBtn" class="province-focus-btn province-focus-btn--secondary" type="button">进入相册</button>
+                <button id="focusCreateAnchorBtn" class="province-focus-btn" type="button">手动放置</button>
+              </div>
             </div>
+            <button id="closeProvinceFocusBtn" class="province-focus-close" type="button" aria-label="关闭省份面板">×</button>
           </div>
-          <div class="province-focus-stage">
-            <svg
-              id="provinceFocusMap"
-              class="province-focus-map"
-              viewBox="0 0 1000 700"
-              role="img"
-              aria-label="放大的省份摄影模块"
-            >
-              <g id="focusProvinceLayer"></g>
-              <g id="focusAnchorLayer"></g>
-              <g id="focusLabelLayer"></g>
-            </svg>
-          </div>
+
+          <div id="focusProvinceList" class="province-focus-list"></div>
         </section>
-      </div>
+      </aside>
     </section>
   </main>
+
+  <section id="anchorGalleryModal" class="anchor-gallery-modal" aria-hidden="true">
+    <div class="anchor-gallery-dialog" role="dialog" aria-modal="true" aria-labelledby="anchorGalleryTitle">
+      <div class="anchor-gallery-head">
+        <div class="anchor-gallery-copy">
+          <p class="anchor-gallery-kicker">SHANLIC PHOTO ATLAS</p>
+          <strong id="anchorGalleryTitle">Gallery</strong>
+          <span id="anchorGalleryMeta"></span>
+        </div>
+        <button id="closeAnchorGalleryBtn" class="anchor-gallery-close" type="button" aria-label="Close gallery">×</button>
+      </div>
+      <div class="anchor-gallery-body">
+        <iframe
+          id="anchorGalleryFrame"
+          class="anchor-gallery-frame"
+          src="about:blank"
+          title="Photography gallery"
+        ></iframe>
+      </div>
+    </div>
+  </section>
 
   <dialog id="anchorNameDialog" class="anchor-name-dialog" aria-labelledby="anchorNameTitle">
     <form class="anchor-name-form" method="dialog">
       <div class="anchor-name-copy">
         <h2 id="anchorNameTitle">创建摄影展示页</h2>
-        <p>给当前锚点起个名字，稍后还可以继续往里面添加照片和相册。</p>
       </div>
       <label class="anchor-name-field" for="anchorNameInput">
         <span>展示页名称</span>

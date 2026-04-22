@@ -10,6 +10,7 @@ function registerDesktopIpcHandlers({
   notesAssets,
   photographyAssets,
   windows,
+  usageTracker,
   getAutoLaunchState,
   setAutoLaunchEnabled,
   updater,
@@ -70,6 +71,10 @@ function registerDesktopIpcHandlers({
   }
 
   function decorateModuleStorageInfo(moduleId, info) {
+    if (moduleId === 'notes' && notesAssets) {
+      return notesAssets.getStorageInfoWithAssets(info)
+    }
+
     if (moduleId === 'photography' && photographyAssets) {
       return photographyAssets.getStorageInfoWithAssets(info)
     }
@@ -493,6 +498,14 @@ function registerDesktopIpcHandlers({
     }
 
     const nextInfo = storage.moveModuleStorage(moduleId, result.filePaths[0])
+    if (moduleId === 'notes' && notesAssets) {
+      const { assetsRoot } = notesAssets.moveAssetsForStorageChange(currentInfo, nextInfo)
+      const rewrittenPayload = notesAssets.rewriteNotesModulePayload(
+        storage.readModuleStorage(moduleId),
+        assetsRoot,
+      )
+      storage.writeModuleStorage(moduleId, rewrittenPayload)
+    }
     if (moduleId === 'photography' && photographyAssets) {
       const { assetsRoot } = photographyAssets.moveAssetsForStorageChange(currentInfo, nextInfo)
       const rewrittenPayload = photographyAssets.rewritePhotographyModulePayload(
@@ -500,6 +513,9 @@ function registerDesktopIpcHandlers({
         assetsRoot,
       )
       storage.writeModuleStorage(moduleId, rewrittenPayload)
+    }
+    if (moduleId === 'hobby') {
+      usageTracker?.reloadFromStorage?.()
     }
     notifyStorageChanged(moduleId)
     return {
@@ -511,6 +527,14 @@ function registerDesktopIpcHandlers({
   ipcMain.handle('desktop-storage:reset-module-directory', (_event, moduleId) => {
     const currentInfo = storage.getModuleStorageInfo(moduleId)
     const nextInfo = storage.moveModuleStorage(moduleId, null)
+    if (moduleId === 'notes' && notesAssets) {
+      const { assetsRoot } = notesAssets.moveAssetsForStorageChange(currentInfo, nextInfo)
+      const rewrittenPayload = notesAssets.rewriteNotesModulePayload(
+        storage.readModuleStorage(moduleId),
+        assetsRoot,
+      )
+      storage.writeModuleStorage(moduleId, rewrittenPayload)
+    }
     if (moduleId === 'photography' && photographyAssets) {
       const { assetsRoot } = photographyAssets.moveAssetsForStorageChange(currentInfo, nextInfo)
       const rewrittenPayload = photographyAssets.rewritePhotographyModulePayload(
@@ -518,6 +542,9 @@ function registerDesktopIpcHandlers({
         assetsRoot,
       )
       storage.writeModuleStorage(moduleId, rewrittenPayload)
+    }
+    if (moduleId === 'hobby') {
+      usageTracker?.reloadFromStorage?.()
     }
     notifyStorageChanged(moduleId)
     return {
@@ -738,6 +765,19 @@ function registerDesktopIpcHandlers({
       ? { ...parsed.modules }
       : {}
 
+    if (nextModules.notes && notesAssets) {
+      const assetsRoot = notesAssets.getNotesAssetsRoot()
+      nextModules.notes = notesAssets.rewriteNotesModulePayload(
+        nextModules.notes,
+        assetsRoot,
+        {
+          assetNames: Array.isArray(parsed.assets?.notes)
+            ? parsed.assets.notes.map((entry) => entry?.name)
+            : [],
+        },
+      )
+    }
+
     if (nextModules.photography && photographyAssets) {
       const assetsRoot = photographyAssets.getPhotographyAssetsRoot()
       nextModules.photography = photographyAssets.rewritePhotographyModulePayload(
@@ -749,6 +789,8 @@ function registerDesktopIpcHandlers({
     storage.replaceAllModuleStorage(nextModules)
     notesAssets.replaceNotesAssets(parsed.assets?.notes || [])
     photographyAssets?.replacePhotographyAssets?.(parsed.assets?.photography || [])
+    usageTracker?.reloadFromStorage?.()
+    notifyStorageChanged('hobby')
 
     return {
       canceled: false,
@@ -790,6 +832,10 @@ function registerDesktopIpcHandlers({
       fileCount: rootUsage.fileCount,
       sections,
     }
+  })
+
+  ipcMain.handle('desktop-usage:get-heatmap-state', () => {
+    return usageTracker?.getSnapshot?.() ?? null
   })
 
   ipcMain.handle('desktop-updater:get-state', () => {

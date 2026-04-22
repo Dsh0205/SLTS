@@ -7,6 +7,8 @@ export function renderGroupSelectorUI({
   listElement,
   onToggle,
   escapeHtml,
+  getGroupDescription,
+  isGroupSelectable,
 }) {
   titleElement.textContent = label + "测试分组";
   hintElement.textContent = "You can select multiple groups. Empty groups will not be used in tests.";
@@ -20,16 +22,22 @@ export function renderGroupSelectorUI({
     checkbox.type = "checkbox";
     checkbox.value = group.id;
     checkbox.checked = selection.has(group.id);
-    checkbox.disabled = group.entries.length === 0;
+    const selectable = typeof isGroupSelectable === "function"
+      ? isGroupSelectable(group)
+      : group.entries.length > 0;
+    checkbox.disabled = !selectable;
     checkbox.addEventListener("change", () => {
       onToggle(group.id, checkbox.checked);
     });
 
     const meta = document.createElement("div");
     meta.className = "group-picker-meta";
+    const description = typeof getGroupDescription === "function"
+      ? getGroupDescription(group)
+      : group.entries.length + " entries";
     meta.innerHTML =
       "<strong>" + escapeHtml(group.name) + "</strong>" +
-      "<span>" + group.entries.length + " entries</span>";
+      "<span>" + escapeHtml(description) + "</span>";
 
     option.appendChild(checkbox);
     option.appendChild(meta);
@@ -133,6 +141,7 @@ export function renderWordColumnUI({
   renderPreview = false,
   container,
   escapeHtml,
+  groupProgressMap,
 }) {
   if (renderPreview) {
     container.innerHTML = "";
@@ -146,6 +155,7 @@ export function renderWordColumnUI({
     }
 
     groups.forEach((group) => {
+      const progress = groupProgressMap?.[group.id];
       const item = document.createElement("div");
       item.className = "group-preview-item";
       if (activeGroupId === group.id) {
@@ -157,7 +167,8 @@ export function renderWordColumnUI({
       meta.className = "group-preview-meta";
       meta.innerHTML =
         "<strong>" + escapeHtml(group.name) + "</strong>" +
-        "<small>" + group.entries.length + " entries</small>";
+        "<small>" + buildPreviewCountText(group, progress) + "</small>" +
+        "<small>" + buildPreviewProgressText(progress) + "</small>";
       meta.addEventListener("click", () => {
         onSelectGroup(group.id);
       });
@@ -191,13 +202,17 @@ export function renderWordColumnUI({
   listElement.hidden = false;
 
   sortedGroups.forEach((group) => {
+    const progress = groupProgressMap?.[group.id];
     const item = document.createElement("li");
     item.className = "group-word-block";
 
     const header = document.createElement("div");
     header.className = "group-word-header";
     header.innerHTML =
+      "<div class=\"group-word-heading\">" +
       "<strong>" + escapeHtml(group.name) + "</strong>" +
+      "<small>" + escapeHtml(buildPreviewProgressText(progress)) + "</small>" +
+      "</div>" +
       "<span class=\"pill\">" + group.entries.length + "</span>";
 
     const entriesWrap = document.createElement("div");
@@ -231,6 +246,137 @@ export function renderWordColumnUI({
     item.appendChild(entriesWrap);
     listElement.appendChild(item);
   });
+}
+
+export function renderEntryRecordsUI({
+  entries,
+  listElement,
+  emptyElement,
+  emptyText,
+  escapeHtml,
+  getBadgeText,
+}) {
+  listElement.innerHTML = "";
+  if (emptyText) {
+    emptyElement.textContent = emptyText;
+  }
+
+  if (!entries || entries.length === 0) {
+    listElement.hidden = true;
+    emptyElement.hidden = false;
+    return;
+  }
+
+  emptyElement.hidden = true;
+  listElement.hidden = false;
+
+  entries.forEach((entry) => {
+    const item = document.createElement("li");
+    const meta = document.createElement("div");
+    meta.className = "word-meta";
+    meta.innerHTML =
+      "<strong>" + escapeHtml(entry.word) + "</strong>" +
+      "<span>" + escapeHtml(entry.meaning) + "</span>";
+    item.appendChild(meta);
+
+    const badgeText = typeof getBadgeText === "function" ? getBadgeText(entry) : "";
+    if (badgeText) {
+      const badge = document.createElement("span");
+      badge.className = "pill";
+      badge.textContent = badgeText;
+      item.appendChild(badge);
+    }
+
+    listElement.appendChild(item);
+  });
+}
+
+export function renderGroupProgressPanelUI({
+  group,
+  summary,
+  bodyElement,
+  emptyElement,
+  statsElement,
+  masteredListElement,
+  masteredEmptyElement,
+  wrongListElement,
+  wrongEmptyElement,
+  escapeHtml,
+}) {
+  if (!group) {
+    bodyElement.hidden = true;
+    emptyElement.hidden = false;
+    emptyElement.textContent = "先创建并选择一个分组，学习记录会显示在这里。";
+    statsElement.innerHTML = "";
+    renderEntryRecordsUI({
+      entries: [],
+      listElement: masteredListElement,
+      emptyElement: masteredEmptyElement,
+      emptyText: "还没有已背单词。",
+      escapeHtml,
+    });
+    renderEntryRecordsUI({
+      entries: [],
+      listElement: wrongListElement,
+      emptyElement: wrongEmptyElement,
+      emptyText: "还没有错词记录。",
+      escapeHtml,
+    });
+    return;
+  }
+
+  bodyElement.hidden = false;
+  emptyElement.hidden = true;
+  statsElement.innerHTML = "";
+
+  [
+    { label: "总词数", value: summary.totalCount },
+    { label: "已背", value: summary.masteredCount },
+    { label: "错词", value: summary.wrongCount },
+    { label: "待背", value: summary.remainingCount },
+  ].forEach((item) => {
+    const stat = document.createElement("div");
+    stat.className = "group-progress-stat";
+    stat.innerHTML =
+      "<strong>" + String(item.value) + "</strong>" +
+      "<span>" + escapeHtml(item.label) + "</span>";
+    statsElement.appendChild(stat);
+  });
+
+  renderEntryRecordsUI({
+    entries: summary.masteredEntries,
+    listElement: masteredListElement,
+    emptyElement: masteredEmptyElement,
+    emptyText: "这个分组还没有已背单词。",
+    escapeHtml,
+  });
+
+  renderEntryRecordsUI({
+    entries: summary.wrongEntries,
+    listElement: wrongListElement,
+    emptyElement: wrongEmptyElement,
+    emptyText: "这个分组还没有错词记录。",
+    escapeHtml,
+    getBadgeText(entry) {
+      return entry.wrongCount > 1 ? "错 " + entry.wrongCount + " 次" : "错 1 次";
+    },
+  });
+}
+
+function buildPreviewCountText(group, progress) {
+  if (!progress) {
+    return group.entries.length + " 词";
+  }
+
+  return progress.totalCount + " 词";
+}
+
+function buildPreviewProgressText(progress) {
+  if (!progress) {
+    return "还没有学习记录";
+  }
+
+  return "已背 " + progress.masteredCount + " / " + progress.totalCount + " · 错词 " + progress.wrongCount;
 }
 
 export function syncGroupSelectOptions({

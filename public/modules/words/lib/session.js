@@ -1,4 +1,11 @@
-export function createStartedSessionState({ mode, selectedGroupIds, entries, shuffleEntries }) {
+export function createStartedSessionState({
+  mode,
+  selectedGroupIds,
+  entries,
+  shuffleEntries,
+  masteredEntryKeys = new Set(),
+  carryOverWrongKeys = new Set(),
+}) {
   return {
     currentMode: mode,
     currentSelectedGroupIds: selectedGroupIds.slice(),
@@ -7,8 +14,8 @@ export function createStartedSessionState({ mode, selectedGroupIds, entries, shu
     currentRoundPendingEntries: [],
     currentQuestionEntry: null,
     currentRoundSize: 0,
-    masteredEntryKeys: new Set(),
-    carryOverWrongKeys: new Set(),
+    masteredEntryKeys: new Set(masteredEntryKeys),
+    carryOverWrongKeys: new Set(carryOverWrongKeys),
     sessionActive: true,
     roundCelebrationVisible: false,
   };

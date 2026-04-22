@@ -495,6 +495,48 @@ body.is-desktop-shell .floating-note-btn.desktop-only {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+.markdown-body .note-code-block {
+  position: relative;
+  margin: 16px 0;
+}
+
+.markdown-body .note-code-block pre {
+  margin: 0;
+  padding-top: 52px;
+}
+
+.markdown-body .note-code-copy-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(127, 94, 186, 0.16);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #5b418c;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+  z-index: 1;
+}
+
+.markdown-body .note-code-copy-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 10px 18px rgba(107, 76, 160, 0.12);
+}
+
+.markdown-body .note-code-copy-btn.is-copied {
+  background: rgba(91, 65, 140, 0.92);
+  color: #ffffff;
+  border-color: rgba(91, 65, 140, 0.92);
+}
+
 .markdown-body code {
   background: #fffde7;
   padding: 0.2em 0.4em;

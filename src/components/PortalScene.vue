@@ -21,10 +21,12 @@ type DesktopBridge = {
   getAutoLaunch?: () => Promise<{ supported?: boolean, enabled?: boolean } | null>
   setAutoLaunch?: (enabled: boolean) => Promise<{ supported?: boolean, enabled?: boolean } | null>
   getStorageUsage?: () => Promise<DesktopStorageUsage | null>
+  getUsageHeatmapState?: () => Promise<DesktopUsageSnapshot | null>
   getUpdateState?: () => Promise<DesktopUpdateState | null>
   checkForUpdates?: () => Promise<DesktopUpdateState | null>
   installUpdate?: () => Promise<{ started?: boolean, state?: DesktopUpdateState | null } | null>
   onUpdateStateChange?: (callback: (state: DesktopUpdateState | null) => void) => (() => void)
+  onMirroredStorageChanged?: (callback: (moduleId: string) => void) => (() => void)
 }
 
 type SettingsPanelExpose = InstanceType<typeof PortalSettingsPanel>
@@ -49,6 +51,12 @@ type DesktopStorageUsage = {
     fileCount?: number
   }>
 }
+type DesktopUsageSnapshot = {
+  activeDays?: number
+  days?: Array<{
+    durationMs?: number
+  }>
+}
 
 const desktopBridge = ref<DesktopBridge | null>(null)
 const settingsPanelRef = ref<SettingsPanelExpose | null>(null)
@@ -70,6 +78,7 @@ const desktopUpdateState = ref<DesktopUpdateState>({
 })
 const desktopActionMessage = ref('')
 const desktopActionTone = ref<'info' | 'success' | 'error'>('info')
+const hobbyActiveDays = ref(0)
 
 const cardPosition = reactive({ x: 0, y: 0 })
 const connector = reactive({ x: 0, y: 0, length: 0, angle: 0 })
@@ -79,6 +88,8 @@ let pointerX = 0
 let pointerY = 0
 let trackingFrame = 0
 let removeUpdateStateListener = () => {}
+let removeStorageChangeListener = () => {}
+let hobbyDaysTimer = 0
 const HOVER_SNAP_DISTANCE = 110
 const HOVER_RELEASE_DISTANCE = 146
 const HOVER_SWITCH_ADVANTAGE = 16
@@ -94,6 +105,13 @@ const launchableModules = computed(() => [
 
 const isDesktop = computed(() => Boolean(desktopBridge.value?.isElectron))
 const hoveredModule = computed(() => launchableModules.value.find((module) => module.key === hoveredKey.value) ?? null)
+const displayedHoveredModule = computed(() => {
+  if (!hoveredModule.value) {
+    return null
+  }
+
+  return hoveredModule.value.key === props.centerModule.key ? null : hoveredModule.value
+})
 const updateSupported = computed(() => Boolean(desktopUpdateState.value.supported))
 const updateActionBusy = computed(() => {
   const status = desktopUpdateState.value.status
@@ -454,6 +472,68 @@ function applyDesktopUpdateState(state: DesktopUpdateState | null | undefined) {
   }
 }
 
+function parseHobbyActiveDaysFromLocalStorage() {
+  try {
+    const raw = window.localStorage.getItem('usage-checkin-heatmap-v1')
+    if (!raw) {
+      return 0
+    }
+
+    const parsed = JSON.parse(raw)
+    const entries = parsed?.entries
+
+    if (!entries || typeof entries !== 'object') {
+      return 0
+    }
+
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+
+    let activeDays = 0
+
+    for (let offset = 0; offset < 365; offset += 1) {
+      const date = new Date(now)
+      date.setDate(now.getDate() - offset)
+      const key = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('-')
+      const entry = entries[key]
+      const durationMs = Number(entry?.durationMs)
+
+      if (Number.isFinite(durationMs) && durationMs > 0) {
+        activeDays += 1
+      }
+    }
+
+    return activeDays
+  } catch {
+    return 0
+  }
+}
+
+async function syncHobbyActiveDays() {
+  if (desktopBridge.value?.getUsageHeatmapState) {
+    try {
+      const snapshot = await desktopBridge.value.getUsageHeatmapState()
+      if (typeof snapshot?.activeDays === 'number') {
+        hobbyActiveDays.value = snapshot.activeDays
+        return
+      }
+
+      if (Array.isArray(snapshot?.days)) {
+        hobbyActiveDays.value = snapshot.days.filter((day) => Number(day?.durationMs) > 0).length
+        return
+      }
+    } catch {
+      // Fall back to localStorage when desktop snapshot is unavailable.
+    }
+  }
+
+  hobbyActiveDays.value = parseHobbyActiveDaysFromLocalStorage()
+}
+
 async function syncAutoLaunchState() {
   if (!desktopBridge.value?.getAutoLaunch) {
     launchAtStartupEnabled.value = false
@@ -672,11 +752,20 @@ function handleResize() {
 
 onMounted(() => {
   desktopBridge.value = (window as Window & { shanlicDesktop?: DesktopBridge }).shanlicDesktop ?? null
+  void syncHobbyActiveDays()
   void syncAutoLaunchState()
   void syncUpdateState()
   removeUpdateStateListener = desktopBridge.value?.onUpdateStateChange?.((state) => {
     applyDesktopUpdateState(state)
   }) ?? (() => {})
+  removeStorageChangeListener = desktopBridge.value?.onMirroredStorageChanged?.((moduleId) => {
+    if (moduleId === 'hobby') {
+      void syncHobbyActiveDays()
+    }
+  }) ?? (() => {})
+  hobbyDaysTimer = window.setInterval(() => {
+    void syncHobbyActiveDays()
+  }, 5000)
   window.addEventListener('resize', handleResize)
   window.addEventListener('scroll', handleResize, { passive: true })
   window.addEventListener('pointerdown', handleWindowPointerDown)
@@ -690,8 +779,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', handleWindowPointerDown)
   window.removeEventListener('keydown', handleWindowKeydown)
   removeUpdateStateListener()
+  removeStorageChangeListener()
   clearLaunchTimers()
   resetLaunchState()
+  window.clearInterval(hobbyDaysTimer)
   window.cancelAnimationFrame(trackingFrame)
 })
 </script>
@@ -732,7 +823,7 @@ onBeforeUnmount(() => {
       :stage-style="stageStyle"
       :music-label="musicLabel"
       :hovered-key="hoveredKey"
-      :hovered-module="hoveredModule"
+      :hovered-module="displayedHoveredModule"
       :launching-key="launchingKey"
       :launching-active="Boolean(launchingModule)"
       :sun-transition-active="sunTransitionActive"
@@ -742,6 +833,7 @@ onBeforeUnmount(() => {
       :burst-style="burstStyle"
       :burst-active="burst.active"
       :sun-tint-style="sunTintStyle"
+      :center-active-days="hobbyActiveDays"
       :get-boosted-duration="getBoostedDuration"
       :set-node-ref="setNodeRef"
       @wheel="onWheel"

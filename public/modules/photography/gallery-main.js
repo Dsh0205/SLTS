@@ -24,6 +24,7 @@ export function initGalleryPage() {
   const desktopBridge = window.shanlicDesktop || null;
   const params = new URLSearchParams(window.location.search);
   const anchorIdFromQuery = params.get("anchor");
+  const embedded = params.get("embedded") === "1";
   const dom = getDom();
 
   let state = loadState();
@@ -37,6 +38,14 @@ export function initGalleryPage() {
   let animateAlbumEntry = false;
   let animateShelfEntry = true;
 
+  if (document.body) {
+    document.body.dataset.embedded = embedded ? "true" : "false";
+  }
+
+  if (embedded && dom.backToMapBtn) {
+    dom.backToMapBtn.textContent = "关闭相册";
+  }
+
   if (anchorIdFromQuery && state.anchors.some((anchor) => anchor.id === anchorIdFromQuery) && state.activeAnchorId !== anchorIdFromQuery) {
     state.activeAnchorId = anchorIdFromQuery;
     saveState(state);
@@ -45,7 +54,7 @@ export function initGalleryPage() {
   if (!getActiveAnchor(state)) {
     showToast(TEXT.noAnchor);
     window.setTimeout(() => {
-      window.location.href = "./index.html";
+      leaveGallery("missing-anchor");
     }, 700);
     return;
   }
@@ -65,7 +74,7 @@ export function initGalleryPage() {
     });
 
     dom.backToMapBtn.addEventListener("click", () => {
-      window.location.href = "./index.html";
+      leaveGallery("back");
     });
 
     dom.albumBackBtn.addEventListener("click", () => {
@@ -143,7 +152,7 @@ export function initGalleryPage() {
       }
       reloadState();
       if (!getActiveAnchor(state)) {
-        window.location.href = "./index.html";
+        leaveGallery("storage-sync-missing-anchor");
         return;
       }
       render();
@@ -156,7 +165,7 @@ export function initGalleryPage() {
       desktopBridge.reloadMirroredStorage?.();
       reloadState();
       if (!getActiveAnchor(state)) {
-        window.location.href = "./index.html";
+        leaveGallery("mirror-sync-missing-anchor");
         return;
       }
       render();
@@ -210,14 +219,19 @@ export function initGalleryPage() {
     }
 
     const album = getActiveAlbum(state, anchor);
+    const photoCount = getPhotoCount(anchor);
+    const positionText = `${Math.round(anchor.x)} / ${Math.round(anchor.y)}`;
     dom.galleryTitle.textContent = anchor.name;
-    dom.galleryStatus.hidden = true;
-    dom.galleryStatus.textContent = "";
+    dom.galleryStatus.hidden = false;
+    dom.galleryStatus.textContent = `${anchor.provinceName} · Coordinates ${positionText}`;
     dom.anchorNameInput.value = anchor.name;
     dom.anchorProvinceValue.textContent = `所在省份 · ${anchor.provinceName}`;
-    dom.anchorPositionValue.textContent = `地图坐标 · ${Math.round(anchor.x)} / ${Math.round(anchor.y)}`;
+    dom.anchorPositionValue.textContent = `地图坐标 · ${positionText}`;
     dom.anchorAlbumCountValue.textContent = `${anchor.albums.length} 个相册`;
-    dom.anchorPhotoCountValue.textContent = `${getPhotoCount(anchor)} 张照片`;
+    dom.anchorPhotoCountValue.textContent = `${photoCount} 张照片`;
+    dom.galleryProvinceBadge.textContent = anchor.provinceName;
+    dom.galleryAlbumBadge.textContent = String(anchor.albums.length);
+    dom.galleryPhotoBadge.textContent = String(photoCount);
 
     dom.addPhotosBtn.disabled = !album || migrationBusy;
     dom.deleteAlbumBtn.disabled = !album || migrationBusy;
@@ -232,17 +246,19 @@ export function initGalleryPage() {
   }
 
   function renderToolbar(anchor, album) {
-    dom.contentSubtitle.hidden = true;
-    dom.contentSubtitle.textContent = "";
+    const positionText = `${Math.round(anchor.x)} / ${Math.round(anchor.y)}`;
+    dom.contentSubtitle.hidden = false;
 
     if (viewMode === "album" && album) {
       dom.albumBackBtn.hidden = false;
       dom.contentTitle.textContent = album.name;
+      dom.contentSubtitle.textContent = `${album.photos.length} 张作品 · 创建于 ${formatDateTime(album.createdAt)}`;
       return;
     }
 
     dom.albumBackBtn.hidden = true;
     dom.contentTitle.textContent = "相册书架";
+    dom.contentSubtitle.textContent = `${anchor.provinceName} · 坐标 ${positionText}`;
   }
 
   function renderShelf(anchor) {
@@ -744,7 +760,7 @@ export function initGalleryPage() {
     if (deleted) {
       void deletePhotoAssets(photoPaths);
       setPanelMenuOpen(false);
-      window.location.href = "./index.html";
+      leaveGallery("delete-anchor");
     }
   }
 
@@ -1160,6 +1176,18 @@ export function initGalleryPage() {
       dom.toast.classList.remove("show");
     }, 1900);
   }
+
+  function leaveGallery(reason = "close") {
+    if (embedded && window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: "shanlic:close-photography-gallery",
+        reason,
+      }, "*");
+      return;
+    }
+
+    window.location.href = "./index.html";
+  }
 }
 
 function getDom() {
@@ -1170,6 +1198,9 @@ function getDom() {
     backToMapBtn: document.getElementById("backToMapBtn"),
     galleryTitle: document.getElementById("galleryTitle"),
     galleryStatus: document.getElementById("galleryStatus"),
+    galleryProvinceBadge: document.getElementById("galleryProvinceBadge"),
+    galleryAlbumBadge: document.getElementById("galleryAlbumBadge"),
+    galleryPhotoBadge: document.getElementById("galleryPhotoBadge"),
     anchorNameInput: document.getElementById("anchorNameInput"),
     anchorProvinceValue: document.getElementById("anchorProvinceValue"),
     anchorPositionValue: document.getElementById("anchorPositionValue"),

@@ -2,6 +2,21 @@ export function generateId(prefix) {
   return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
 
+export function normalizeEntryIdentityPart(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase();
+}
+
+export function getEntryIdentityKey(entry) {
+  return normalizeEntryIdentityPart(entry?.word) + "\u0000" + normalizeEntryIdentityPart(entry?.meaning);
+}
+
+export function getEntryWordKey(entry) {
+  return normalizeEntryIdentityPart(entry?.word);
+}
+
 export function createEmptyGroup(name) {
   return {
     id: generateId("group"),
@@ -160,6 +175,7 @@ export function parseImportedWordsText(rawText, options) {
     return {
       english: normalizeImportedModePayload(parsed, englishLabel, importedGroupName),
       russian: [],
+      progress: null,
     };
   }
 
@@ -167,6 +183,7 @@ export function parseImportedWordsText(rawText, options) {
     return {
       english: normalizeImportedModePayload(parsed.wordBanks.english, englishLabel, importedGroupName),
       russian: normalizeImportedModePayload(parsed.wordBanks.russian, russianLabel, importedGroupName),
+      progress: parsed.wordBanks.progress || null,
     };
   }
 
@@ -174,6 +191,7 @@ export function parseImportedWordsText(rawText, options) {
     return {
       english: normalizeImportedModePayload(parsed.english, englishLabel, importedGroupName),
       russian: normalizeImportedModePayload(parsed.russian, russianLabel, importedGroupName),
+      progress: parsed.progress || null,
     };
   }
 
@@ -195,6 +213,7 @@ export function parseImportedWordsText(rawText, options) {
       })).filter((entry) => entry.word && entry.meaning),
     }],
     russian: [],
+    progress: null,
   };
 }
 
@@ -214,15 +233,24 @@ export function findGroup(groups, groupId) {
   return groups.find((group) => group.id === groupId) || null;
 }
 
-export function pushEntryToGroup(groups, groupId, entry) {
+export function pushEntryToGroup(groups, groupId, entry, options = {}) {
   const group = findGroup(groups, groupId);
   if (!group) {
-    return false;
+    return { added: false, duplicateEntry: null };
   }
 
-  const exists = group.entries.some((item) => item.word === entry.word && item.meaning === entry.meaning);
+  const matchWordOnly = Boolean(options.matchWordOnly);
+  const getKey = matchWordOnly ? getEntryWordKey : getEntryIdentityKey;
+  const entryKey = getKey(entry);
+  const exists = group.entries.some((item) => getKey(item) === entryKey);
   if (exists) {
-    return false;
+    return {
+      added: false,
+      duplicateEntry: {
+        word: String(entry?.word || "").trim(),
+        meaning: String(entry?.meaning || "").trim(),
+      },
+    };
   }
 
   group.entries.push({
@@ -230,19 +258,29 @@ export function pushEntryToGroup(groups, groupId, entry) {
     word: entry.word,
     meaning: entry.meaning,
   });
-  return true;
+  return { added: true, duplicateEntry: null };
 }
 
-export function addEntriesToGroup(groups, groupId, entries) {
+export function addEntriesToGroup(groups, groupId, entries, options = {}) {
   let addedCount = 0;
+  const duplicateEntries = [];
 
   entries.forEach((entry) => {
-    if (pushEntryToGroup(groups, groupId, entry)) {
+    const result = pushEntryToGroup(groups, groupId, entry, options);
+    if (result.added) {
       addedCount += 1;
+      return;
+    }
+
+    if (result.duplicateEntry) {
+      duplicateEntries.push(result.duplicateEntry);
     }
   });
 
-  return addedCount;
+  return {
+    addedCount,
+    duplicateEntries,
+  };
 }
 
 export function removeEntryFromGroup(groups, groupId, entryId) {
@@ -294,7 +332,7 @@ export function collectEntriesFromGroups(groups, groupIds) {
     }
 
     group.entries.forEach((entry) => {
-      const key = entry.word + "\u0000" + entry.meaning;
+      const key = getEntryIdentityKey(entry);
       if (!uniqueEntries.has(key)) {
         uniqueEntries.set(key, {
           id: entry.id,

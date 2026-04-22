@@ -433,6 +433,70 @@
       color: var(--muted);
     }
 
+    .group-progress-card {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(60, 42, 20, 0.08);
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    .group-progress-card h4,
+    .progress-word-panel h5 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      color: var(--accent-deep);
+    }
+
+    .group-progress-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .group-progress-stat {
+      padding: 14px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(60, 42, 20, 0.08);
+      background: rgba(255, 250, 242, 0.92);
+      text-align: center;
+    }
+
+    .group-progress-stat strong,
+    .group-progress-stat span {
+      display: block;
+    }
+
+    .group-progress-stat strong {
+      font-size: 1.2rem;
+      color: var(--ink);
+    }
+
+    .group-progress-stat span {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .group-progress-lists {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .progress-word-panel {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(60, 42, 20, 0.08);
+      background: rgba(255, 252, 247, 0.9);
+    }
+
+    .progress-word-list {
+      margin-top: 0;
+      max-height: 240px;
+    }
+
     .keyboard-note {
       margin-top: 12px;
     }
@@ -1174,6 +1238,29 @@
       grid-template-columns: 1fr;
     }
 
+    .quiz-bottom-actions {
+      display: flex;
+      justify-content: center;
+    }
+
+    .quiz-delete-word-btn {
+      width: 54px;
+      height: 54px;
+      padding: 0;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+    }
+
+    .quiz-delete-word-icon {
+      display: block;
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
     .option-btn {
       min-height: 74px;
       text-align: center;
@@ -1244,6 +1331,16 @@
       margin: 0 0 22px;
       text-align: center;
       font-size: clamp(2rem, 6vw, 3rem);
+    }
+
+    .words-search-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .words-search-input {
+      width: min(460px, 100%);
     }
 
     .mode-select-grid {
@@ -1467,6 +1564,13 @@
       gap: 12px;
     }
 
+    .group-word-heading small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
     .group-word-entries {
       display: grid;
       gap: 10px;
@@ -1598,7 +1702,9 @@
       .options,
       .mode-select-grid,
       .library-entry-grid,
-      .words-list-grid {
+      .words-list-grid,
+      .group-progress-lists,
+      .group-progress-stats {
         grid-template-columns: 1fr;
       }
     }
@@ -1702,6 +1808,12 @@
           <h3 class="question-word" id="questionWord">apple</h3>
           <div id="options" class="options"></div>
         </div>
+
+        <div class="quiz-bottom-actions">
+          <button id="deleteCurrentWordBtn" class="danger-btn quiz-delete-word-btn" type="button" aria-label="删除当前单词">
+            <img class="quiz-delete-word-icon" src="./img/Icons8/icons8-%E5%9E%83%E5%9C%BE%E6%A1%B6-50.png" alt="">
+          </button>
+        </div>
       </div>
     </section>
 
@@ -1773,6 +1885,25 @@
               <button id="englishAddBtn" class="primary-btn" type="button">加入当前分组</button>
             </div>
             <div id="englishGroupsPreview" class="group-preview"></div>
+            <div class="group-progress-card">
+              <h4>当前分组学习记录</h4>
+              <div id="englishProgressEmpty" class="empty-state">先创建并选择一个分组，学习记录会显示在这里。</div>
+              <div id="englishProgressBody" hidden>
+                <div id="englishProgressStats" class="group-progress-stats"></div>
+                <div class="group-progress-lists">
+                  <div class="progress-word-panel">
+                    <h5>已背单词</h5>
+                    <div id="englishMasteredEmpty" class="empty-state">这个分组还没有已背单词。</div>
+                    <ul id="englishMasteredList" class="word-list simple-list progress-word-list" hidden></ul>
+                  </div>
+                  <div class="progress-word-panel">
+                    <h5>错词记录</h5>
+                    <div id="englishWrongProgressEmpty" class="empty-state">这个分组还没有错词记录。</div>
+                    <ul id="englishWrongProgressList" class="word-list simple-list progress-word-list" hidden></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="entry-card">
@@ -1792,6 +1923,25 @@
               <button id="russianAddBtn" class="primary-btn" type="button">加入当前分组</button>
             </div>
             <div id="russianGroupsPreview" class="group-preview"></div>
+            <div class="group-progress-card">
+              <h4>当前分组学习记录</h4>
+              <div id="russianProgressEmpty" class="empty-state">先创建并选择一个分组，学习记录会显示在这里。</div>
+              <div id="russianProgressBody" hidden>
+                <div id="russianProgressStats" class="group-progress-stats"></div>
+                <div class="group-progress-lists">
+                  <div class="progress-word-panel">
+                    <h5>已背单词</h5>
+                    <div id="russianMasteredEmpty" class="empty-state">这个分组还没有已背单词。</div>
+                    <ul id="russianMasteredList" class="word-list simple-list progress-word-list" hidden></ul>
+                  </div>
+                  <div class="progress-word-panel">
+                    <h5>错词记录</h5>
+                    <div id="russianWrongProgressEmpty" class="empty-state">这个分组还没有错词记录。</div>
+                    <ul id="russianWrongProgressList" class="word-list simple-list progress-word-list" hidden></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1807,6 +1957,10 @@
 
         <h2 class="words-title">全部单词</h2>
         <div class="helper-note">右键任意单词可删除该词条。</div>
+
+        <div class="search-box words-search-row">
+          <input id="wordsSearchInput" class="words-search-input" type="search" placeholder="搜索单词、释义或分组" autocomplete="off" spellcheck="false">
+        </div>
 
         <div class="words-list-grid">
           <div class="words-column">

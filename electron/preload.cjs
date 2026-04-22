@@ -201,6 +201,9 @@ contextBridge.exposeInMainWorld('shanlicDesktop', {
   getStorageUsage() {
     return ipcRenderer.invoke('desktop-storage:get-usage')
   },
+  getUsageHeatmapState() {
+    return ipcRenderer.invoke('desktop-usage:get-heatmap-state')
+  },
   getUpdateState() {
     return ipcRenderer.invoke('desktop-updater:get-state')
   },

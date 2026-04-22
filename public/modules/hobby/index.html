@@ -3,48 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HABIT TRACKER</title>
+  <title>打卡热力图</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main class="page-shell">
-    <section class="tracker-card">
-      <div class="tracker-toolbar">
-        <div class="tracker-title">
-          <p class="tracker-kicker">HOBBY TRACKER</p>
-          <h1>LIFE TRACKER</h1>
-        </div>
+    <header class="page-header">
+      <h1 class="page-title">WELCOME TO SHANLIC</h1>
+      <div class="page-actions">
+        <span id="trackingBadge" class="tracking-badge">记录中</span>
+        <button id="jumpTodayBtn" class="secondary-btn" type="button">定位今天</button>
+      </div>
+    </header>
 
-        <div class="tracker-actions">
-          <div class="inline-field">
-            <input id="hobbyNameInput" type="text" maxlength="24" placeholder="新增爱好">
-            <button id="addHobbyBtn" type="button">添加爱好</button>
+    <section class="stats-grid" aria-label="热力统计">
+      <article class="stat-card">
+        <p>今日热度</p>
+        <strong id="todayLevelValue">未记录</strong>
+      </article>
+      <article class="stat-card">
+        <p>点亮天数</p>
+        <strong id="activeDaysValue">0 天</strong>
+      </article>
+      <article class="stat-card">
+        <p>连续记录</p>
+        <strong id="streakValue">0 天</strong>
+      </article>
+    </section>
+
+    <section class="workspace-grid">
+      <section class="board-card">
+        <div class="section-head">
+          <h2>HEATMAP</h2>
+          <div class="legend" aria-label="热力图图例">
+            <span class="legend-chip level-0" title="未记录" aria-label="未记录"></span>
+            <span class="legend-chip level-1" title="轻量" aria-label="轻量"></span>
+            <span class="legend-chip level-2" title="稳定" aria-label="稳定"></span>
+            <span class="legend-chip level-3" title="专注" aria-label="专注"></span>
+            <span class="legend-chip level-4" title="高强度" aria-label="高强度"></span>
           </div>
-          <button id="resetMonthBtn" class="ghost-btn" type="button">清空本月爱好</button>
         </div>
+
+        <div id="boardScroll" class="board-scroll">
+          <div id="heatmapGrid" class="heatmap-grid" role="grid" aria-label="最近 365 天使用热力图"></div>
+        </div>
+
+        <div class="board-footer">
+          <p id="rangeHint">365 GRID</p>
+          <p id="syncStatusValue">AUTO SAVE</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="focus-panel">
+      <div class="focus-panel-head">
+        <h2>FOCUS MODE</h2>
+        <button id="openFocusDialogBtn" class="primary-btn" type="button">开始专注</button>
       </div>
 
-      <div class="tracker-meta">
-        <article class="meta-pill">
-          <span>爱好列</span>
-          <strong id="hobbyCountValue">0</strong>
+      <div class="focus-grid">
+        <article class="focus-card">
+          <p>倒计时</p>
+          <strong id="focusTimerValue">未开始</strong>
         </article>
-        <article class="meta-pill">
-          <span>本月完成</span>
-          <strong id="completedCountValue">0</strong>
+        <article class="focus-card">
+          <p>本月专注</p>
+          <strong id="focusSummaryValue">0 分钟</strong>
         </article>
       </div>
 
-      <div class="table-scroll">
-        <table class="tracker-table">
-          <thead id="trackerHead"></thead>
-          <tbody id="trackerBody"></tbody>
-        </table>
+      <p id="focusStatusValue" class="focus-status">准备开始</p>
+
+      <div class="focus-history-wrap">
+        <ul id="focusHistoryList" class="focus-history-list"></ul>
       </div>
     </section>
   </main>
 
-  <div id="toast" class="toast" aria-live="polite"></div>
+  <div id="focusDialog" class="focus-modal" hidden>
+    <div class="focus-modal-backdrop" data-close-focus-dialog></div>
+    <div class="focus-modal-card" role="dialog" aria-modal="true" aria-labelledby="focusDialogTitle">
+      <h3 id="focusDialogTitle">开始专注</h3>
+      <label class="focus-field" for="focusDurationInput">
+        <span>分钟</span>
+        <input id="focusDurationInput" type="number" min="1" max="720" step="1" inputmode="numeric" value="25">
+      </label>
+      <div class="focus-modal-actions">
+        <button id="focusCancelBtn" class="ghost-btn" type="button">取消</button>
+        <button id="focusConfirmBtn" class="primary-btn" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="focusCompleteModal" class="focus-modal" hidden>
+    <div class="focus-modal-backdrop" data-close-focus-complete></div>
+    <div class="focus-modal-card focus-modal-card--complete" role="dialog" aria-modal="true" aria-labelledby="focusCompleteTitle">
+      <h3 id="focusCompleteTitle">恭喜完成专注</h3>
+      <p id="focusCompleteText" class="focus-complete-text">本次专注已完成。</p>
+      <div class="focus-modal-actions">
+        <button id="focusCompleteBtn" class="primary-btn" type="button">好的</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./app.js"></script>
 </body>

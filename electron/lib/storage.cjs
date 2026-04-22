@@ -20,7 +20,7 @@ function createStorageManager({ app }) {
     }
 
     try {
-      const raw = fs.readFileSync(filePath, 'utf8')
+      const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '')
       const parsed = JSON.parse(raw)
       return {
         moduleDirectories: parsed?.moduleDirectories && typeof parsed.moduleDirectories === 'object'

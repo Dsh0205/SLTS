@@ -9,38 +9,57 @@ const STORAGE_KEY = "shanlic-photography-map-v1";
 const STORAGE_VERSION = PHOTOGRAPHY_STORAGE_VERSION;
 const ANCHOR_POSITION_STORAGE_VERSION = 6;
 const SVG_NS = "http://www.w3.org/2000/svg";
-const XLINK_NS = "http://www.w3.org/1999/xlink";
+const ANCHOR_ICON_PATH = "../words/img/Icons8/icons8-地图针-50.png";
+const EMBEDDED_GALLERY_URL = "./gallery.html?embedded=1";
 const MAP_WIDTH = 1000;
 const MAP_HEIGHT = 700;
 const MAP_PADDING = 42;
+const IDENTITY_MAP_TRANSFORM = { scale: 1, translateX: 0, translateY: 0 };
+const MIN_MAP_SCALE = 1;
+const MAX_MAP_SCALE = 4;
+const MAP_PAN_THRESHOLD = 6;
+const MAP_CLICK_SUPPRESSION_MS = 240;
 const FOCUS_VIEWBOX_WIDTH = 1000;
 const FOCUS_VIEWBOX_HEIGHT = 700;
 const FOCUS_PADDING_X = 120;
 const FOCUS_PADDING_Y = 108;
-const ANCHOR_ICON_PATH = "../words/img/Icons8/icons8-地图针-50.png";
 const TEXT = {
-  addAnchor: "已创建新的摄影展示页",
+  addAnchor: "已创建新的摄影地点",
   saveError: "保存失败，请稍后再试",
   mapLoadError: "地图数据加载失败，请刷新页面后重试",
-  focusHint: "点击放大的省份地图即可创建锚点，也可以先点“创建锚点”再放置。",
-  focusSubtitle: "点击省份空白区域创建锚点，点击已有锚点进入相册页面",
+  focusHint: "点击放大的省份地图即可进入相册，也可以先点“手动放置”创建地点。",
+  focusSubtitle: "点击省份空白区域创建地点，点击已有地点进入相册页面。",
 };
-const FOCUS_HINT_TEXT = "点击放大的省份地图即可创建锚点，也可以先点“创建锚点”再放置。";
-const FOCUS_PLACEMENT_HINT_TEXT = "已进入放置模式，请在放大地图中点击要创建锚点的位置。";
-const FOCUS_SUBTITLE_TEXT = "点击省份空白区域创建锚点，点击已有锚点进入相册页面";
+const FOCUS_HINT_TEXT = "点击放大的省份地图即可进入相册，也可以先点“手动放置”创建地点。";
+const FOCUS_PLACEMENT_HINT_TEXT = "已进入放置模式，请在放大地图里点击你要创建地点的位置。";
+const FOCUS_SUBTITLE_TEXT = "点击省份空白区域创建地点，点击已有地点进入相册页面。";
 const FOCUS_PLACEMENT_READY_TEXT = "已进入创建模式，请在放大地图中点击位置";
-const FOCUS_PLACEMENT_CANCELED_TEXT = "已取消锚点放置";
+const FOCUS_PLACEMENT_CANCELED_TEXT = "已取消地点放置";
 const desktopBridge = window.shanlicDesktop || null;
 
+const mapView = document.getElementById("mapView");
 const chinaMap = document.getElementById("chinaMap");
+const mapViewport = document.getElementById("mapViewport");
 const provinceShapeLayer = document.getElementById("provinceShapeLayer");
 const provinceSelectionLayer = document.getElementById("provinceSelectionLayer");
+const provinceLabelLayer = document.getElementById("provinceLabelLayer");
 const anchorLayer = document.getElementById("anchorLayer");
 const toast = document.getElementById("toast");
+const mapStageRail = document.getElementById("mapStageRail");
+const mapVisitedProvinceCount = document.getElementById("mapVisitedProvinceCount");
+const mapAnchorCount = document.getElementById("mapAnchorCount");
+const mapActiveProvinceName = document.getElementById("mapActiveProvinceName");
+const mapActiveProvinceMeta = document.getElementById("mapActiveProvinceMeta");
 const provinceFocusBackdrop = document.getElementById("provinceFocusBackdrop");
 const closeProvinceFocusBtn = document.getElementById("closeProvinceFocusBtn");
 const focusProvinceName = document.getElementById("focusProvinceName");
 const focusProvinceHint = document.getElementById("focusProvinceHint");
+const focusProvinceAnchorCount = document.getElementById("focusProvinceAnchorCount");
+const focusProvinceAlbumCount = document.getElementById("focusProvinceAlbumCount");
+const focusProvincePhotoCount = document.getElementById("focusProvincePhotoCount");
+const focusProvinceListCount = document.getElementById("focusProvinceListCount");
+const focusProvinceEmpty = document.getElementById("focusProvinceEmpty");
+const focusProvinceList = document.getElementById("focusProvinceList");
 const focusEnterGalleryBtn = document.getElementById("focusEnterGalleryBtn");
 const focusCreateAnchorBtn = document.getElementById("focusCreateAnchorBtn");
 const provinceFocusMap = document.getElementById("provinceFocusMap");
@@ -49,6 +68,11 @@ const focusAnchorLayer = document.getElementById("focusAnchorLayer");
 const focusLabelLayer = document.getElementById("focusLabelLayer");
 const anchorNameDialog = document.getElementById("anchorNameDialog");
 const anchorNameInput = document.getElementById("anchorNameInput");
+const anchorGalleryModal = document.getElementById("anchorGalleryModal");
+const anchorGalleryTitle = document.getElementById("anchorGalleryTitle");
+const anchorGalleryMeta = document.getElementById("anchorGalleryMeta");
+const anchorGalleryFrame = document.getElementById("anchorGalleryFrame");
+const closeAnchorGalleryBtn = document.getElementById("closeAnchorGalleryBtn");
 
 let provinces = [];
 let provinceById = new Map();
@@ -63,26 +87,48 @@ let lastAnchorAnimationKey = "";
 let focusAnchorPromptPending = false;
 let isFocusAnchorPlacementMode = false;
 let suppressNextFocusMapClick = false;
+let currentMapTransform = { ...IDENTITY_MAP_TRANSFORM };
+let mapTransformAnimationFrame = 0;
+let galleryModalUnloadTimer = 0;
+let lastMapViewportKey = "__initial__";
+let suppressMapClickUntil = 0;
+let mapPanState = null;
 
 bindEvents();
 bootstrap();
 
 function bindEvents() {
   chinaMap?.addEventListener("pointerdown", handleChinaMapPointerDown);
+  chinaMap?.addEventListener("pointermove", handleChinaMapPointerMove);
+  chinaMap?.addEventListener("pointerup", handleChinaMapPointerUp);
+  chinaMap?.addEventListener("pointercancel", handleChinaMapPointerUp);
+  chinaMap?.addEventListener("lostpointercapture", handleChinaMapPointerUp);
+  chinaMap?.addEventListener("wheel", handleChinaMapWheel, { passive: false });
   chinaMap?.addEventListener("contextmenu", handleChinaMapContextMenu);
   closeProvinceFocusBtn?.addEventListener("click", closeProvinceFocus);
   focusEnterGalleryBtn?.addEventListener("click", handleFocusEnterGalleryButtonClick);
   focusCreateAnchorBtn?.addEventListener("click", handleFocusCreateAnchorButtonClick);
+  closeAnchorGalleryBtn?.addEventListener("click", () => closeGalleryModal());
   provinceFocusBackdrop?.addEventListener("click", (event) => {
     if (event.target === provinceFocusBackdrop) closeProvinceFocus();
+  });
+  anchorGalleryModal?.addEventListener("click", (event) => {
+    if (event.target === anchorGalleryModal) closeGalleryModal();
   });
   provinceFocusMap?.addEventListener("pointerdown", handleFocusPointerDown);
   provinceFocusMap?.addEventListener("click", handleFocusMapClick);
   provinceFocusMap?.addEventListener("contextmenu", handleFocusContextMenu);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && focusProvinceId && !anchorNameDialog?.open) closeProvinceFocus();
+    if (event.key !== "Escape") return;
+    if (isGalleryModalOpen()) {
+      closeGalleryModal();
+      return;
+    }
+    if (focusProvinceId && !anchorNameDialog?.open) closeProvinceFocus();
   });
+  window.addEventListener("resize", handleViewportResize);
   window.addEventListener("storage", handleStorageSync);
+  window.addEventListener("message", handleGalleryFrameMessage);
   desktopBridge?.onMirroredStorageChanged?.((moduleId) => {
     if (moduleId !== "photography") return;
     desktopBridge.reloadMirroredStorage?.();
@@ -107,10 +153,47 @@ function bootstrap() {
     state = loadState();
     syncSelectionWithState();
     render();
+    scheduleInteractionWarmup();
   } catch (error) {
     console.error(error);
     showToast(TEXT.mapLoadError);
   }
+}
+
+function scheduleInteractionWarmup() {
+  const runWarmup = () => {
+    warmAnchorIconAsset();
+    warmOverlayLayers();
+    warmGalleryFrame();
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(() => runWarmup(), { timeout: 900 });
+    return;
+  }
+
+  window.setTimeout(runWarmup, 240);
+}
+
+function warmAnchorIconAsset() {
+  if (typeof Image !== "function") return;
+
+  const icon = new Image();
+  icon.decoding = "async";
+  icon.src = ANCHOR_ICON_PATH;
+  icon.decode?.().catch(() => {});
+}
+
+function warmOverlayLayers() {
+  window.requestAnimationFrame(() => {
+    provinceFocusBackdrop?.getBoundingClientRect?.();
+    anchorGalleryModal?.getBoundingClientRect?.();
+  });
+}
+
+function warmGalleryFrame() {
+  if (!state.anchors.length) return;
+  ensureGalleryFrameReady();
 }
 
 function buildProvinceModels(geojson) {
@@ -243,20 +326,21 @@ function computeScreenBounds(polygons, projector) {
 }
 
 function createPalette(index) {
-  const hue = (18 + index * 137.508) % 360;
+  const hue = 132 + (index % 6) * 4;
+  const lightness = 24 + (index % 4) * 3;
   return {
-    fill: `hsl(${hue} 58% 72%)`,
-    stroke: `hsl(${hue} 68% 34%)`,
-    activeFill: `hsl(${hue} 66% 82%)`,
-    activeStroke: `hsl(${hue} 78% 24%)`,
-    hoverFill: `hsl(${hue} 64% 78%)`,
-    hoverStroke: `hsl(${hue} 72% 28%)`,
-    selectionFill: `hsl(${hue} 70% 48% / 0.22)`,
-    selectionStroke: `hsl(${hue} 80% 22% / 0.84)`,
-    focusFill: `hsl(${hue} 48% 84%)`,
-    focusOutlineFill: `hsl(${hue} 60% 50% / 0.12)`,
-    focusOutlineStroke: `hsl(${hue} 65% 30% / 0.36)`,
-    focusShadow: `hsl(${hue} 80% 22% / 0.24)`,
+    fill: `hsl(${hue} 26% ${lightness}%)`,
+    stroke: `hsl(${hue} 30% 46%)`,
+    activeFill: `hsl(${hue} 42% 38%)`,
+    activeStroke: `hsl(${hue} 58% 80%)`,
+    hoverFill: `hsl(${hue} 34% 32%)`,
+    hoverStroke: `hsl(${hue} 50% 70%)`,
+    selectionFill: `hsl(${hue} 58% 54% / 0.16)`,
+    selectionStroke: `hsl(${hue} 68% 78% / 0.9)`,
+    focusFill: `hsl(${hue} 38% 68%)`,
+    focusOutlineFill: `hsl(${hue} 56% 56% / 0.12)`,
+    focusOutlineStroke: `hsl(${hue} 62% 76% / 0.26)`,
+    focusShadow: `hsl(${hue} 44% 10% / 0.42)`,
   };
 }
 
@@ -296,7 +380,7 @@ function renderProvinceMap() {
     });
 
     group.append(...paths);
-    group.addEventListener("click", () => openProvinceFocus(province.id));
+    group.addEventListener("click", (event) => handleProvinceShapeClick(event, province.id));
     provinceShapeLayer.appendChild(group);
     provinceNodes.set(province.id, { group, paths, province });
   });
@@ -460,12 +544,169 @@ function serializeState() {
 
 function syncSelectionWithState() {
   if (!provinceById.has(selectedProvinceId)) selectedProvinceId = null;
+  if (!provinceById.has(focusProvinceId)) focusProvinceId = null;
 }
 
-function render() {
+function render(options = {}) {
+  const { forceViewport = false } = options;
+  mapView?.classList.toggle("is-province-panel-open", Boolean(focusProvinceId));
+  mapView?.classList.toggle("is-anchor-placement", isFocusAnchorPlacementMode);
+  renderMapStageMeta();
+  renderMapViewport(forceViewport);
   renderProvinceSelection();
+  renderProvinceLabels();
   renderAnchors();
   renderFocusOverlay();
+}
+
+function renderMapViewport(force = false) {
+  const viewportKey = getMapViewportKey();
+  if (!force && viewportKey === lastMapViewportKey) {
+    return;
+  }
+
+  lastMapViewportKey = viewportKey;
+  const province = provinceById.get(focusProvinceId || selectedProvinceId) || null;
+  const targetTransform = province
+    ? createMapViewportTransform(province.bounds)
+    : IDENTITY_MAP_TRANSFORM;
+  animateMapViewport(targetTransform);
+}
+
+function setMapViewportAnimating(isAnimating) {
+  mapView?.classList.toggle("is-map-animating", Boolean(isAnimating));
+}
+
+function createMapViewportTransform(bounds) {
+  const width = Math.max(1, bounds.maxX - bounds.minX);
+  const height = Math.max(1, bounds.maxY - bounds.minY);
+  const isDesktop = window.innerWidth >= 1024;
+  const availableWidth = isDesktop ? MAP_WIDTH * 0.54 : MAP_WIDTH - 132;
+  const availableHeight = isDesktop ? MAP_HEIGHT - 152 : MAP_HEIGHT - 220;
+  const scale = Math.max(1, Math.min(
+    isDesktop ? 2.55 : 2.15,
+    availableWidth / width,
+    availableHeight / height,
+  ));
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const targetCenterX = isDesktop ? 360 : MAP_WIDTH / 2;
+  const targetCenterY = isDesktop ? MAP_HEIGHT * 0.53 : MAP_HEIGHT * 0.39;
+
+  return {
+    scale,
+    translateX: targetCenterX - centerX * scale,
+    translateY: targetCenterY - centerY * scale,
+  };
+}
+
+function animateMapViewport(targetTransform) {
+  if (!mapViewport) return;
+
+  const deltaScale = Math.abs(targetTransform.scale - currentMapTransform.scale);
+  const deltaX = Math.abs(targetTransform.translateX - currentMapTransform.translateX);
+  const deltaY = Math.abs(targetTransform.translateY - currentMapTransform.translateY);
+  if (deltaScale < 0.001 && deltaX < 0.5 && deltaY < 0.5) {
+    currentMapTransform = { ...targetTransform };
+    applyMapViewportTransform(currentMapTransform);
+    mapTransformAnimationFrame = 0;
+    setMapViewportAnimating(false);
+    return;
+  }
+
+  window.cancelAnimationFrame(mapTransformAnimationFrame);
+  setMapViewportAnimating(true);
+  const startTransform = { ...currentMapTransform };
+  const startedAt = window.performance.now();
+  const duration = 760;
+
+  const frame = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - (1 - progress) ** 3;
+    currentMapTransform = {
+      scale: startTransform.scale + (targetTransform.scale - startTransform.scale) * eased,
+      translateX: startTransform.translateX + (targetTransform.translateX - startTransform.translateX) * eased,
+      translateY: startTransform.translateY + (targetTransform.translateY - startTransform.translateY) * eased,
+    };
+    applyMapViewportTransform(currentMapTransform);
+    if (progress < 1) {
+      mapTransformAnimationFrame = window.requestAnimationFrame(frame);
+      return;
+    }
+
+    mapTransformAnimationFrame = 0;
+    setMapViewportAnimating(false);
+  };
+
+  mapTransformAnimationFrame = window.requestAnimationFrame(frame);
+}
+
+function applyMapViewportTransform(transform) {
+  mapViewport?.setAttribute(
+    "transform",
+    `translate(${transform.translateX.toFixed(2)} ${transform.translateY.toFixed(2)}) scale(${transform.scale.toFixed(4)})`,
+  );
+}
+
+function stopMapViewportAnimation() {
+  window.cancelAnimationFrame(mapTransformAnimationFrame);
+  mapTransformAnimationFrame = 0;
+  setMapViewportAnimating(false);
+}
+
+function getMapViewportKey() {
+  return focusProvinceId || selectedProvinceId || "identity";
+}
+
+function setMapPanning(isPanning) {
+  mapView?.classList.toggle("is-map-panning", Boolean(isPanning));
+  chinaMap?.classList.toggle("is-panning", Boolean(isPanning));
+}
+
+function suppressMapClick() {
+  suppressMapClickUntil = window.performance.now() + MAP_CLICK_SUPPRESSION_MS;
+}
+
+function shouldSuppressMapClick() {
+  return window.performance.now() < suppressMapClickUntil;
+}
+
+function renderMapStageMeta() {
+  {
+    const activeProvince = provinceById.get(focusProvinceId || selectedProvinceId) || null;
+    mapStageRail?.toggleAttribute("hidden", !activeProvince);
+    if (mapActiveProvinceName) {
+      mapActiveProvinceName.textContent = activeProvince ? activeProvince.name : "";
+    }
+    return;
+  }
+  const provinceIds = new Set(state.anchors.map((anchor) => anchor.provinceId));
+  const activeProvince = provinceById.get(focusProvinceId || selectedProvinceId) || null;
+
+  if (mapVisitedProvinceCount) {
+    mapVisitedProvinceCount.textContent = String(provinceIds.size);
+  }
+
+  if (mapAnchorCount) {
+    mapAnchorCount.textContent = String(state.anchors.length);
+  }
+
+  if (mapActiveProvinceName) {
+    mapActiveProvinceName.textContent = activeProvince ? activeProvince.name : "等待选择";
+  }
+
+  if (mapActiveProvinceMeta) {
+    if (!activeProvince) {
+      mapActiveProvinceMeta.textContent = "点击任意省份放大查看，也可以在放大地图里直接创建新的摄影地点。";
+      return;
+    }
+
+    const provinceAnchors = state.anchors.filter((anchor) => anchor.provinceId === activeProvince.id);
+    const albumCount = provinceAnchors.reduce((total, anchor) => total + (Array.isArray(anchor.albums) ? anchor.albums.length : 0), 0);
+    mapActiveProvinceMeta.textContent = provinceAnchors.length > 0
+      ? `${provinceAnchors.length} 个地点 · ${albumCount} 个相册，点击放大地图继续浏览`
+      : "这个地区还没有地点记录，点进放大视图后就能放下第一个地点。";
+  }
 }
 
 function openProvinceFocus(provinceId) {
@@ -473,6 +714,23 @@ function openProvinceFocus(provinceId) {
   focusProvinceId = provinceId;
   setFocusAnchorPlacementMode(false);
   render();
+}
+
+function handleProvinceShapeClick(event, provinceId) {
+  if (shouldSuppressMapClick()) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
+  if (isFocusAnchorPlacementMode && focusProvinceId === provinceId) {
+    event.preventDefault();
+    event.stopPropagation();
+    void createAnchorFromSelectedProvinceClick(event, provinceId);
+    return;
+  }
+
+  openProvinceFocus(provinceId);
 }
 
 function openOrCreateGalleryForProvince(provinceId) {
@@ -546,10 +804,10 @@ function setFocusAnchorPlacementMode(enabled) {
 }
 
 function syncFocusAnchorPlacementUi() {
-  if (focusProvinceHint) {
-    focusProvinceHint.textContent = isFocusAnchorPlacementMode
-      ? FOCUS_PLACEMENT_HINT_TEXT
-      : "\u518d\u6b21\u70b9\u51fb\u653e\u5927\u7684\u7701\u4efd\u5730\u56fe\u5373\u53ef\u8fdb\u5165\u76f8\u518c\u9875\u9762\uff0c\u4e5f\u53ef\u4ee5\u5148\u70b9\u201c\u624b\u52a8\u653e\u7f6e\u201d\u521b\u5efa\u951a\u70b9\u3002";
+  if (focusProvinceHint && isFocusAnchorPlacementMode) {
+    focusProvinceHint.textContent = FOCUS_PLACEMENT_HINT_TEXT;
+  } else if (focusProvinceHint && !focusProvinceId) {
+    focusProvinceHint.textContent = FOCUS_HINT_TEXT;
   }
 
   if (focusCreateAnchorBtn) {
@@ -557,6 +815,7 @@ function syncFocusAnchorPlacementUi() {
     focusCreateAnchorBtn.textContent = isFocusAnchorPlacementMode ? "取消放置" : "手动放置";
   }
 
+  mapView?.classList.toggle("is-anchor-placement", isFocusAnchorPlacementMode);
   provinceFocusMap?.classList.toggle("is-anchor-placement", isFocusAnchorPlacementMode);
 }
 
@@ -582,6 +841,99 @@ function renderProvinceSelection() {
   });
 }
 
+function renderProvinceLabels() {
+  if (!provinceLabelLayer) {
+    return;
+  }
+
+  provinceLabelLayer.replaceChildren();
+
+  [
+    { provinceId: "province_810000", label: "香港", offsetX: 112, offsetY: -18 },
+    { provinceId: "province_820000", label: "澳门", offsetX: 112, offsetY: 40 },
+  ].forEach((item) => {
+    const province = provinceById.get(item.provinceId);
+    if (!province) {
+      return;
+    }
+
+    const sourceX = province.centerPoint.x;
+    const sourceY = province.centerPoint.y;
+    const targetX = clampNumber(sourceX + item.offsetX, 72, MAP_WIDTH - 72, sourceX);
+    const targetY = clampNumber(sourceY + item.offsetY, 44, MAP_HEIGHT - 44, sourceY);
+    const badgeWidth = 58;
+    const badgeHeight = 24;
+    const badgeX = targetX - badgeWidth / 2;
+    const badgeY = targetY - badgeHeight / 2;
+    const connectorX = badgeX + 8;
+    const elbowX = connectorX - 22;
+
+    const group = document.createElementNS(SVG_NS, "g");
+    group.classList.add("province-label-group");
+    if (province.id === selectedProvinceId || province.id === focusProvinceId) {
+      group.classList.add("is-active");
+    }
+    group.dataset.provinceId = province.id;
+    group.setAttribute("tabindex", "0");
+    group.setAttribute("role", "button");
+    group.setAttribute("aria-label", `${item.label}，点击查看省份`);
+
+    const dot = document.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("class", "province-label-dot");
+    dot.setAttribute("cx", sourceX.toFixed(2));
+    dot.setAttribute("cy", sourceY.toFixed(2));
+    dot.setAttribute("r", "3.8");
+
+    const callout = document.createElementNS(SVG_NS, "path");
+    callout.setAttribute("class", "province-label-callout");
+    callout.setAttribute(
+      "d",
+      `M${sourceX.toFixed(2)} ${sourceY.toFixed(2)} L${elbowX.toFixed(2)} ${sourceY.toFixed(2)} L${connectorX.toFixed(2)} ${targetY.toFixed(2)}`,
+    );
+
+    const badge = document.createElementNS(SVG_NS, "rect");
+    badge.setAttribute("class", "province-label-badge");
+    badge.setAttribute("x", badgeX.toFixed(2));
+    badge.setAttribute("y", badgeY.toFixed(2));
+    badge.setAttribute("width", String(badgeWidth));
+    badge.setAttribute("height", String(badgeHeight));
+    badge.setAttribute("rx", "12");
+    badge.setAttribute("ry", "12");
+
+    const text = document.createElementNS(SVG_NS, "text");
+    text.setAttribute("class", "province-label");
+    text.setAttribute("x", targetX.toFixed(2));
+    text.setAttribute("y", targetY.toFixed(2));
+    text.textContent = item.label;
+
+    const hotspot = document.createElementNS(SVG_NS, "rect");
+    hotspot.setAttribute("class", "province-label-hotspot");
+    hotspot.setAttribute("x", (badgeX - 10).toFixed(2));
+    hotspot.setAttribute("y", (badgeY - 10).toFixed(2));
+    hotspot.setAttribute("width", String(badgeWidth + 20));
+    hotspot.setAttribute("height", String(badgeHeight + 20));
+    hotspot.setAttribute("rx", "16");
+    hotspot.setAttribute("ry", "16");
+
+    group.append(callout, dot, badge, text, hotspot);
+    group.addEventListener("click", (event) => {
+      if (shouldSuppressMapClick()) {
+        event.preventDefault();
+        return;
+      }
+      openProvinceFocus(province.id);
+    });
+    group.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openProvinceFocus(province.id);
+      }
+    });
+
+    provinceLabelLayer.appendChild(group);
+  });
+}
+
 function renderAnchors() {
   anchorLayer.replaceChildren();
   const hasProvinceSelection = Boolean(selectedProvinceId);
@@ -592,7 +944,6 @@ function renderAnchors() {
     const group = document.createElementNS(SVG_NS, "g");
     group.classList.add("map-anchor");
     if (hasProvinceSelection && anchor.provinceId !== selectedProvinceId) group.classList.add("is-muted");
-    if (hasProvinceSelection && anchor.provinceId === selectedProvinceId) group.classList.add("is-label-visible");
     if (anchor.id === state.activeAnchorId) group.classList.add("is-active");
     group.dataset.anchorId = anchor.id;
     group.setAttribute("transform", `translate(${anchor.x} ${anchor.y})`);
@@ -606,7 +957,13 @@ function renderAnchors() {
       visual.style.setProperty("--module-pop-index", String(index));
     }
     group.append(visual);
-    group.addEventListener("click", () => openGalleryForAnchor(anchor.id));
+    group.addEventListener("click", (event) => {
+      if (shouldSuppressMapClick()) {
+        event.preventDefault();
+        return;
+      }
+      openGalleryForAnchor(anchor.id);
+    });
     group.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
@@ -620,24 +977,200 @@ function renderAnchors() {
 }
 
 function renderFocusOverlay() {
+  {
+    const activeProvince = provinceById.get(focusProvinceId);
+    if (!activeProvince || !provinceFocusBackdrop) {
+      provinceFocusBackdrop?.classList.remove("is-open");
+      provinceFocusBackdrop?.setAttribute("aria-hidden", "true");
+      if (focusProvinceList instanceof HTMLElement) {
+        focusProvinceList.replaceChildren();
+        focusProvinceList.hidden = true;
+      }
+      focusTransform = null;
+      isFocusAnchorPlacementMode = false;
+      syncFocusAnchorPlacementUi();
+      return;
+    }
+
+    provinceFocusBackdrop.classList.add("is-open");
+    provinceFocusBackdrop.setAttribute("aria-hidden", "false");
+    const provinceAnchors = state.anchors
+      .filter((anchor) => anchor.provinceId === activeProvince.id)
+      .sort((left, right) => {
+        if (left.id === state.activeAnchorId) return -1;
+        if (right.id === state.activeAnchorId) return 1;
+        return String(right.createdAt || "").localeCompare(String(left.createdAt || ""));
+      });
+    const provinceAlbumTotal = provinceAnchors.reduce((total, anchor) => total + getAnchorAlbumCount(anchor), 0);
+
+    focusProvinceName.textContent = activeProvince.name;
+    if (focusProvinceAlbumCount) {
+      focusProvinceAlbumCount.textContent = `${provinceAlbumTotal} 相册`;
+    }
+
+    renderProvincePanelList(provinceAnchors);
+    syncFocusAnchorPlacementUi();
+    return;
+  }
   const province = provinceById.get(focusProvinceId);
   if (!province || !provinceFocusBackdrop) {
-    provinceFocusBackdrop?.setAttribute("hidden", "");
-    focusProvinceLayer?.replaceChildren();
-    focusAnchorLayer?.replaceChildren();
-    focusLabelLayer?.replaceChildren();
+    provinceFocusBackdrop?.classList.remove("is-open");
+    provinceFocusBackdrop?.setAttribute("aria-hidden", "true");
+    focusProvinceList?.replaceChildren();
+    if (focusProvinceEmpty instanceof HTMLElement) {
+      focusProvinceEmpty.hidden = true;
+    }
+    if (focusProvinceListCount) {
+      focusProvinceListCount.textContent = "0 entries";
+    }
     focusTransform = null;
     isFocusAnchorPlacementMode = false;
     syncFocusAnchorPlacementUi();
     return;
   }
 
-  provinceFocusBackdrop.hidden = false;
-  focusProvinceName.textContent = `${province.name} 摄影模块`;
-  focusTransform = createFocusTransform(province.bounds);
+  provinceFocusBackdrop.classList.add("is-open");
+  provinceFocusBackdrop.setAttribute("aria-hidden", "false");
+  const provinceAnchors = state.anchors
+    .filter((anchor) => anchor.provinceId === province.id)
+    .sort((left, right) => {
+      if (left.id === state.activeAnchorId) return -1;
+      if (right.id === state.activeAnchorId) return 1;
+      return String(right.createdAt || "").localeCompare(String(left.createdAt || ""));
+    });
+  const provinceAlbumTotal = provinceAnchors.reduce((total, anchor) => total + getAnchorAlbumCount(anchor), 0);
+  const provincePhotoTotal = provinceAnchors.reduce((total, anchor) => total + getAnchorPhotoCount(anchor), 0);
+
+  focusProvinceName.textContent = province.name;
+  if (focusProvinceAnchorCount) {
+    focusProvinceAnchorCount.textContent = `${provinceAnchors.length} 个地点`;
+  }
+  if (focusProvinceAlbumCount) {
+    focusProvinceAlbumCount.textContent = `${provinceAlbumTotal} 个相册`;
+  }
+  if (focusProvincePhotoCount) {
+    focusProvincePhotoCount.textContent = `${provincePhotoTotal} 张照片`;
+  }
+  if (focusProvinceListCount) {
+    focusProvinceListCount.textContent = `${provinceAnchors.length} entries`;
+  }
+
+  if (focusProvinceHint) {
+    focusProvinceHint.textContent = isFocusAnchorPlacementMode
+      ? FOCUS_PLACEMENT_HINT_TEXT
+      : provinceAnchors.length > 0
+        ? "点击下面的地点卡片进入相册，也可以继续在地图上放下新的摄影地点。"
+        : "这个省份还没有地点，点击“手动放置”后回到地图点一下就能创建。";
+  }
+
+  renderProvincePanelList(provinceAnchors);
   syncFocusAnchorPlacementUi();
-  renderFocusProvince(province);
-  renderFocusAnchors(province);
+}
+
+function renderProvincePanelList(anchors) {
+  {
+    if (!(focusProvinceList instanceof HTMLElement)) {
+      return;
+    }
+
+    focusProvinceList.replaceChildren();
+    const hasEntries = anchors.length > 0;
+    focusProvinceList.hidden = !hasEntries;
+
+    if (!hasEntries) {
+      return;
+    }
+
+    anchors.forEach((anchor, index) => {
+      const albumTotal = getAnchorAlbumCount(anchor);
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "province-entry-card";
+      if (anchor.id === state.activeAnchorId) {
+        card.classList.add("is-active");
+      }
+      card.style.setProperty("--module-pop-index", String(index));
+      card.setAttribute("aria-label", `${anchor.name}，点击打开相册`);
+      card.addEventListener("click", () => openGalleryForAnchor(anchor.id));
+
+      const head = document.createElement("div");
+      head.className = "province-entry-card-head";
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "province-entry-card-copy";
+
+      const title = document.createElement("strong");
+      title.textContent = anchor.name;
+
+      const subtitle = document.createElement("span");
+      subtitle.textContent = `${albumTotal} 相册`;
+
+      titleWrap.append(title, subtitle);
+      head.append(titleWrap);
+      card.append(head);
+      focusProvinceList.appendChild(card);
+    });
+    return;
+  }
+  if (!(focusProvinceList instanceof HTMLElement) || !(focusProvinceEmpty instanceof HTMLElement)) {
+    return;
+  }
+
+  focusProvinceList.replaceChildren();
+  const hasAnchors = anchors.length > 0;
+  focusProvinceEmpty.hidden = hasAnchors;
+  focusProvinceList.hidden = !hasAnchors;
+
+  if (!hasAnchors) {
+    return;
+  }
+
+  anchors.forEach((anchor, index) => {
+    const albumCount = getAnchorAlbumCount(anchor);
+    const photoCount = getAnchorPhotoCount(anchor);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "province-entry-card";
+    if (anchor.id === state.activeAnchorId) {
+      card.classList.add("is-active");
+    }
+    card.style.setProperty("--module-pop-index", String(index));
+    card.setAttribute("aria-label", `${anchor.name}，点击打开相册`);
+    card.addEventListener("click", () => openGalleryForAnchor(anchor.id));
+
+    const head = document.createElement("div");
+    head.className = "province-entry-card-head";
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "province-entry-card-copy";
+
+    const title = document.createElement("strong");
+    title.textContent = anchor.name;
+
+    const subtitle = document.createElement("span");
+    subtitle.textContent = `${albumCount} 个相册 · ${photoCount} 张照片`;
+
+    titleWrap.append(title, subtitle);
+
+    const badge = document.createElement("span");
+    badge.className = "province-entry-card-badge";
+    badge.textContent = anchor.id === state.activeAnchorId ? "Current" : "Open";
+
+    head.append(titleWrap, badge);
+
+    const meta = document.createElement("div");
+    meta.className = "province-entry-card-meta";
+
+    const position = document.createElement("span");
+    position.textContent = `坐标 ${Math.round(anchor.x)} / ${Math.round(anchor.y)}`;
+
+    const date = document.createElement("span");
+    date.textContent = formatAnchorDate(anchor.createdAt);
+
+    meta.append(position, date);
+    card.append(head, meta);
+    focusProvinceList.appendChild(card);
+  });
 }
 
 function createFocusTransform(bounds) {
@@ -698,7 +1231,7 @@ function renderFocusProvince(province) {
   subtitle.setAttribute("class", "focus-label-sub");
   subtitle.setAttribute("x", String(center.x));
   subtitle.setAttribute("y", String(center.y + 28));
-  subtitle.textContent = "\u518d\u6b21\u70b9\u51fb\u653e\u5927\u5730\u56fe\u53ef\u76f4\u63a5\u8fdb\u5165\u76f8\u518c\u9875\u9762\uff0c\u70b9\u51fb\u5df2\u6709\u951a\u70b9\u4e5f\u53ef\u76f4\u63a5\u6253\u5f00";
+  subtitle.textContent = "CLICK AGAIN TO ENTER";
   focusLabelLayer.append(title, subtitle);
 }
 
@@ -718,7 +1251,13 @@ function renderFocusAnchors(province) {
     visual.classList.add("module-pop-stagger", "is-bounce");
     visual.style.setProperty("--module-pop-index", String(index));
     group.append(visual);
-    group.addEventListener("click", () => openGalleryForAnchor(anchor.id));
+    group.addEventListener("click", (event) => {
+      if (shouldSuppressMapClick()) {
+        event.preventDefault();
+        return;
+      }
+      openGalleryForAnchor(anchor.id);
+    });
     group.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
@@ -739,10 +1278,12 @@ function applyFocusTransform(point) {
 function createAnchorVisual(labelText, options) {
   const visual = document.createElementNS(SVG_NS, "g");
   visual.setAttribute("class", "anchor-visual module-pop-svg");
+
   const pulse = document.createElementNS(SVG_NS, "circle");
   pulse.setAttribute("class", "anchor-pulse");
   pulse.setAttribute("r", String(options.pulseRadius));
   pulse.setAttribute("cy", String(options.pulseCy));
+
   const icon = document.createElementNS(SVG_NS, "image");
   icon.setAttribute("class", "anchor-icon");
   icon.setAttribute("x", String(options.iconX));
@@ -751,23 +1292,104 @@ function createAnchorVisual(labelText, options) {
   icon.setAttribute("height", String(options.iconHeight));
   icon.setAttribute("preserveAspectRatio", "xMidYMid meet");
   icon.setAttribute("href", ANCHOR_ICON_PATH);
-  icon.setAttributeNS(XLINK_NS, "href", ANCHOR_ICON_PATH);
+  icon.setAttributeNS("http://www.w3.org/1999/xlink", "href", ANCHOR_ICON_PATH);
+
   const label = document.createElementNS(SVG_NS, "text");
   label.setAttribute("class", "anchor-label");
   label.setAttribute("x", "0");
   label.setAttribute("y", String(options.labelY));
   label.textContent = labelText;
+
   visual.append(pulse, icon, label);
   return visual;
 }
 
 function handleChinaMapPointerDown(event) {
-  if (event.button !== 2) return;
-  createAnchorFromMainMapEvent(event);
+  if (event.button === 2) {
+    createAnchorFromMainMapEvent(event);
+    return;
+  }
+
+  if (event.button !== 0 || !chinaMap) return;
+
+  stopMapViewportAnimation();
+  mapPanState = {
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startTranslateX: currentMapTransform.translateX,
+    startTranslateY: currentMapTransform.translateY,
+    didPan: false,
+  };
 }
 
 function handleChinaMapContextMenu(event) {
   createAnchorFromMainMapEvent(event);
+}
+
+function handleChinaMapPointerMove(event) {
+  if (!mapPanState || event.pointerId !== mapPanState.pointerId) return;
+
+  const deltaX = event.clientX - mapPanState.startClientX;
+  const deltaY = event.clientY - mapPanState.startClientY;
+  if (!mapPanState.didPan && Math.hypot(deltaX, deltaY) < MAP_PAN_THRESHOLD) {
+    return;
+  }
+
+  if (!mapPanState.didPan) {
+    mapPanState.didPan = true;
+    setMapPanning(true);
+    chinaMap?.setPointerCapture?.(event.pointerId);
+  }
+
+  currentMapTransform = {
+    ...currentMapTransform,
+    translateX: mapPanState.startTranslateX + deltaX,
+    translateY: mapPanState.startTranslateY + deltaY,
+  };
+  applyMapViewportTransform(currentMapTransform);
+  event.preventDefault();
+}
+
+function handleChinaMapPointerUp(event) {
+  if (!mapPanState || event.pointerId !== mapPanState.pointerId) return;
+
+  const didPan = mapPanState.didPan;
+  mapPanState = null;
+  setMapPanning(false);
+  if (chinaMap?.hasPointerCapture?.(event.pointerId)) {
+    chinaMap.releasePointerCapture(event.pointerId);
+  }
+  if (didPan) {
+    suppressMapClick();
+    event.preventDefault();
+  }
+}
+
+function handleChinaMapWheel(event) {
+  if (!chinaMap) return;
+
+  event.preventDefault();
+  stopMapViewportAnimation();
+
+  const point = toSvgPoint(chinaMap, event.clientX, event.clientY);
+  const worldPoint = toMapViewportPoint(point);
+  const nextScale = clampNumber(
+    currentMapTransform.scale * Math.exp(-event.deltaY * 0.0011),
+    MIN_MAP_SCALE,
+    MAX_MAP_SCALE,
+    currentMapTransform.scale,
+  );
+  if (Math.abs(nextScale - currentMapTransform.scale) < 0.001) {
+    return;
+  }
+
+  currentMapTransform = {
+    scale: nextScale,
+    translateX: point.x - worldPoint.x * nextScale,
+    translateY: point.y - worldPoint.y * nextScale,
+  };
+  applyMapViewportTransform(currentMapTransform);
 }
 
 function handleFocusPointerDown(event) {
@@ -844,11 +1466,27 @@ async function createAnchorFromMainMapEvent(event) {
   const province = provinceById.get(provinceId);
   if (!province) return;
 
-  const mapPoint = toSvgPoint(chinaMap, event.clientX, event.clientY);
+  const mapPoint = toMapViewportPoint(toSvgPoint(chinaMap, event.clientX, event.clientY));
   await createAnchorForProvince(province, mapPoint, {
     openFocus: true,
     requestName: false,
   });
+}
+
+async function createAnchorFromSelectedProvinceClick(event, provinceId) {
+  if (!(event.target instanceof Element)) return;
+  const province = provinceById.get(provinceId);
+  if (!province) return;
+
+  const mapPoint = toMapViewportPoint(toSvgPoint(chinaMap, event.clientX, event.clientY));
+  const created = await createAnchorForProvince(province, mapPoint, {
+    openFocus: true,
+    requestName: false,
+  });
+
+  if (created) {
+    setFocusAnchorPlacementMode(false);
+  }
 }
 
 async function createAnchorForProvince(province, mapPoint, options = {}) {
@@ -979,19 +1617,138 @@ function toSvgPoint(svg, clientX, clientY) {
   return matrix ? point.matrixTransform(matrix.inverse()) : { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 };
 }
 
+function toMapViewportPoint(point) {
+  return {
+    x: (point.x - currentMapTransform.translateX) / currentMapTransform.scale,
+    y: (point.y - currentMapTransform.translateY) / currentMapTransform.scale,
+  };
+}
+
 function openGalleryForAnchor(anchorId) {
+  const anchor = state.anchors.find((item) => item.id === anchorId);
+  if (!anchor) return;
   state.activeAnchorId = anchorId;
   if (!saveState()) return;
-  window.location.href = `./gallery.html?anchor=${encodeURIComponent(anchorId)}`;
+  render();
+  openGalleryModal(anchor);
+}
+
+function ensureGalleryFrameReady() {
+  if (!(anchorGalleryFrame instanceof HTMLIFrameElement)) {
+    return false;
+  }
+
+  window.clearTimeout(galleryModalUnloadTimer);
+  if (anchorGalleryFrame.getAttribute("src") !== EMBEDDED_GALLERY_URL) {
+    anchorGalleryFrame.setAttribute("src", EMBEDDED_GALLERY_URL);
+  }
+  return true;
+}
+
+function openGalleryModal(anchor) {
+  if (!anchor?.id) return;
+
+  const targetUrl = EMBEDDED_GALLERY_URL;
+  if (!(anchorGalleryModal instanceof HTMLElement) || !(anchorGalleryFrame instanceof HTMLIFrameElement)) {
+    window.location.href = targetUrl;
+    return;
+  }
+
+  {
+    const albumTotal = getAnchorAlbumCount(anchor);
+    if (anchorGalleryTitle) {
+      anchorGalleryTitle.textContent = anchor.name || "Gallery";
+    }
+    if (anchorGalleryMeta) {
+      anchorGalleryMeta.textContent = albumTotal > 0 ? `${albumTotal} albums` : "";
+    }
+
+    ensureGalleryFrameReady();
+
+    anchorGalleryModal.classList.add("is-open");
+    anchorGalleryModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("is-gallery-modal-open");
+    return;
+  }
+
+  const albumCount = getAnchorAlbumCount(anchor);
+  const photoCount = getAnchorPhotoCount(anchor);
+  if (anchorGalleryTitle) {
+    anchorGalleryTitle.textContent = anchor.name || "Gallery";
+  }
+  if (anchorGalleryMeta) {
+    anchorGalleryMeta.textContent = `${anchor.provinceName || "Province"} · ${albumCount} albums · ${photoCount} photos`;
+  }
+
+  window.clearTimeout(galleryModalUnloadTimer);
+  if (anchorGalleryFrame.getAttribute("src") !== targetUrl) {
+    anchorGalleryFrame.setAttribute("src", targetUrl);
+  }
+
+  anchorGalleryModal.classList.add("is-open");
+  anchorGalleryModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("is-gallery-modal-open");
+}
+
+function closeGalleryModal(options = {}) {
+  if (!(anchorGalleryModal instanceof HTMLElement)) {
+    return;
+  }
+
+  anchorGalleryModal.classList.remove("is-open");
+  anchorGalleryModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("is-gallery-modal-open");
+
+  if (!(anchorGalleryFrame instanceof HTMLIFrameElement)) {
+    return;
+  }
+
+  const shouldClearFrame = options.clearFrame === true;
+  if (!shouldClearFrame) {
+    return;
+  }
+
+  window.clearTimeout(galleryModalUnloadTimer);
+  galleryModalUnloadTimer = window.setTimeout(() => {
+    if (!isGalleryModalOpen()) {
+      anchorGalleryFrame.setAttribute("src", "about:blank");
+    }
+  }, 260);
+}
+
+function isGalleryModalOpen() {
+  return anchorGalleryModal?.classList.contains("is-open");
+}
+
+function handleGalleryFrameMessage(event) {
+  if (!event?.data || typeof event.data !== "object") {
+    return;
+  }
+
+  if (anchorGalleryFrame?.contentWindow && event.source !== anchorGalleryFrame.contentWindow) {
+    return;
+  }
+
+  if (event.data.type === "shanlic:close-photography-gallery") {
+    closeGalleryModal();
+  }
 }
 
 function closeProvinceFocus() {
   if (anchorNameDialog?.open) {
     anchorNameDialog.close("cancel");
   }
+  selectedProvinceId = null;
   focusProvinceId = null;
   setFocusAnchorPlacementMode(false);
-  renderFocusOverlay();
+  render();
+}
+
+function handleViewportResize() {
+  stopMapViewportAnimation();
+  setMapPanning(false);
+  mapPanState = null;
+  render({ forceViewport: true });
 }
 
 function nearestProvince(x, y) {
@@ -1021,6 +1778,26 @@ function createAnchorName(provinceName) {
     nextName = `${provinceName || "摄影"}摄影点 ${index}`;
   }
   return nextName;
+}
+
+function getAnchorAlbumCount(anchor) {
+  return Array.isArray(anchor?.albums) ? anchor.albums.length : 0;
+}
+
+function getAnchorPhotoCount(anchor) {
+  if (!Array.isArray(anchor?.albums)) return 0;
+  return anchor.albums.reduce((total, album) => total + (Array.isArray(album.photos) ? album.photos.length : 0), 0);
+}
+
+function formatAnchorDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "刚刚创建";
+  }
+  return date.toLocaleDateString("zh-CN", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function buildAnchorName(provinceName, index) {

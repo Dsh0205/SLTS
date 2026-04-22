@@ -33,7 +33,7 @@
 ## 本地开发
 
 ```powershell
-cd "H:\单词\SHANLIC LIFE TRACKER SYSTEM"
+cd "W:\单词\SHANLIC LIFE TRACKER SYSTEM"
 npm install
 npm run dev
 ```

@@ -20,6 +20,7 @@ const props = defineProps<{
   burstStyle: InlineStyle
   burstActive: boolean
   sunTintStyle: InlineStyle
+  centerActiveDays: number
   getBoostedDuration: (duration: string) => string
   setNodeRef: (moduleKey: ModuleKey, element: Element | ComponentPublicInstance | null) => void
 }>()
@@ -124,7 +125,21 @@ defineExpose({
             @click="emit('launchModule', props.centerModule.key)"
           >
             <span class="sun-core-button-ring"></span>
-            <span class="sun-core-button-label">{{ props.centerModule.title }}</span>
+            <span class="sun-core-count" :class="{ 'is-checkmark': props.launchingKey === props.centerModule.key }">
+              <template v-if="props.launchingKey === props.centerModule.key">
+                <img
+                  class="sun-core-checkmark-icon"
+                  src="/modules/words/img/Icons8/icons8-%E5%AF%B9.gif"
+                  alt=""
+                  aria-hidden="true"
+                >
+              </template>
+              <template v-else>
+                <span class="sun-core-count-value">{{ props.centerActiveDays }}</span>
+                <span class="sun-core-count-unit">天</span>
+                <span class="sun-core-count-caption">已打卡</span>
+              </template>
+            </span>
           </button>
         </div>
 
@@ -207,16 +222,22 @@ defineExpose({
 .sun-transition-surface{opacity:0;background:radial-gradient(circle at 34% 24%,color-mix(in srgb,var(--sun-tint-color-soft) 72%,white 28%),color-mix(in srgb,var(--sun-tint-color-soft) 28%,white 12%) 16%,transparent 22%),radial-gradient(circle at 65% 72%,color-mix(in srgb,var(--sun-tint-color) 22%,transparent),transparent 48%),radial-gradient(circle at 42% 42%,color-mix(in srgb,var(--sun-tint-color-soft) 82%,white 18%) 0%,var(--sun-tint-color) 58%,color-mix(in srgb,var(--sun-tint-color) 92%,white 8%) 100%);box-shadow:0 0 72px color-mix(in srgb,var(--sun-tint-color) 56%,transparent),0 0 140px color-mix(in srgb,var(--sun-tint-color) 24%,transparent);transform:scale(.82);transition:opacity 1s ease,transform 1s ease}
 .sun-core-button{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:0;border:0;background:transparent;cursor:pointer;border-radius:50%;color:#fff5e0;pointer-events:auto}
 .sun-core-button-ring{position:absolute;inset:-10px;border-radius:50%;border:1px solid rgba(255,228,186,.28);box-shadow:0 0 0 1px rgba(255,255,255,.06) inset,0 0 24px rgba(255,166,66,.12);opacity:0;transform:scale(.9);transition:opacity .22s ease,transform .22s ease}
-.sun-core-button-label{position:absolute;bottom:-34px;left:50%;padding:6px 12px;border-radius:999px;background:rgba(10,14,22,.56);border:1px solid rgba(255,214,157,.22);font-size:.72rem;font-weight:700;letter-spacing:.08em;white-space:nowrap;transform:translateX(-50%);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;backdrop-filter:blur(10px)}
+.sun-core-count{position:relative;z-index:1;display:grid;justify-items:center;align-content:center;gap:2px;min-height:74px;transform:translateY(2px);transition:transform .22s ease}
+.sun-core-count.is-checkmark{transform:translateY(0) scale(1.03)}
+.sun-core-count-value{font-size:2.2rem;font-weight:900;line-height:.95;letter-spacing:.02em;text-shadow:0 0 22px rgba(255,240,206,.26),0 8px 20px rgba(0,0,0,.18)}
+.sun-core-count-unit{margin-top:-2px;font-size:.8rem;font-weight:800;letter-spacing:.3em;text-indent:.3em;color:rgba(255,241,214,.88)}
+.sun-core-count-caption{font-size:.68rem;font-weight:700;letter-spacing:.2em;color:rgba(255,235,198,.74)}
+.sun-core-checkmark-icon{display:block;width:60px;height:60px;object-fit:contain;filter:drop-shadow(0 0 24px rgba(255,241,214,.3)) drop-shadow(0 10px 24px rgba(0,0,0,.22))}
 .sun-core.is-hovered,.sun-core:focus-within{transform:translate(-50%,-50%) scale(1.04)}
 .sun-core.is-hovered .sun-glow,.sun-core:focus-within .sun-glow{transform:scale(1.12);opacity:1}
 .sun-core.is-hovered .sun-glow,.sun-core:focus-within .sun-glow{animation:pulse-glow 1.35s ease-in-out infinite}
 .sun-core.is-hovered .sun-surface,.sun-core:focus-within .sun-surface{transform:scale(1.08);filter:saturate(1.08) brightness(1.05)}
 .sun-core.is-hovered .sun-core-button-ring,.sun-core:focus-within .sun-core-button-ring{opacity:1;transform:scale(1)}
-.sun-core.is-hovered .sun-core-button-label,.sun-core:focus-within .sun-core-button-label{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.sun-core.is-hovered .sun-core-count,.sun-core:focus-within .sun-core-count{transform:translateY(0) scale(1.03)}
 .sun-core.is-launching .sun-core-button-ring{opacity:1;transform:scale(1.06)}
 .sun-core.is-launching .sun-glow{opacity:1;filter:blur(16px);transform:scale(1.28);animation:pulse-glow .72s ease-in-out infinite}
 .sun-core.is-launching .sun-surface{transform:scale(1.14);filter:saturate(1.16) brightness(1.08)}
+.sun-core.is-launching .sun-core-count{transform:translateY(0) scale(1.08)}
 .sun-core-button:focus-visible{outline:2px solid rgba(255,255,255,.86);outline-offset:6px}
 .sun-core.is-priming:not(.is-transitioning){animation:sun-warmup 1.5s ease-in-out infinite alternate}
 .sun-core.is-transitioning{transform:translate(-50%,-50%) scale(1.08)}
@@ -250,5 +271,5 @@ defineExpose({
 @keyframes burst-expand{from{clip-path:circle(0 at var(--burst-x) var(--burst-y));opacity:1}to{clip-path:circle(var(--burst-radius) at var(--burst-x) var(--burst-y));opacity:1}}
 @keyframes title-scan{0%{transform:translateX(-120%)}48%,100%{transform:translateX(120%)}}
 .music-status{position:absolute;left:24px;bottom:20px;z-index:5;max-width:min(420px,calc(100vw - 32px));padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(7,12,22,.48);backdrop-filter:blur(12px);color:rgba(236,242,255,.84);font-size:.76rem;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 12px 28px rgba(0,0,0,.18)}
-@media (max-width:760px){.portal-scene{--scene-shift-y:clamp(-58px,-7vh,-32px)}.system-title{top:18px;min-width:calc(100% - 28px);padding:10px 12px 12px}.system-title-chip,.system-title-meta{font-size:.56rem;letter-spacing:.24em}.system-title-main{font-size:clamp(.86rem,4vw,1.1rem);letter-spacing:.14em;text-align:center;white-space:normal;line-height:1.25}.solar-plane{width:min(100vw,680px)}.sun-core{width:110px;height:110px}.orbit-node{width:70px;height:70px}.planet-ball{width:38px;height:38px}.music-status{left:12px;bottom:12px;max-width:calc(100vw - 24px);font-size:.7rem}}
+@media (max-width:760px){.portal-scene{--scene-shift-y:clamp(-58px,-7vh,-32px)}.system-title{top:18px;min-width:calc(100% - 28px);padding:10px 12px 12px}.system-title-chip,.system-title-meta{font-size:.56rem;letter-spacing:.24em}.system-title-main{font-size:clamp(.86rem,4vw,1.1rem);letter-spacing:.14em;text-align:center;white-space:normal;line-height:1.25}.solar-plane{width:min(100vw,680px)}.sun-core{width:110px;height:110px}.sun-core-count{min-height:58px}.sun-core-checkmark-icon{width:46px;height:46px}.sun-core-count-value{font-size:1.7rem}.sun-core-count-unit{font-size:.68rem}.sun-core-count-caption{font-size:.58rem}.orbit-node{width:70px;height:70px}.planet-ball{width:38px;height:38px}.music-status{left:12px;bottom:12px;max-width:calc(100vw - 24px);font-size:.7rem}}
 </style>

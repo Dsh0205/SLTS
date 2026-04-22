@@ -48,6 +48,24 @@ function loadRendererPage({ browserWindow, app, rootDir, devServerUrl, relativeP
     }
   })
   return browserWindow.loadURL(url.toString()).catch((error) => {
+    const fallbackPath = resolvePackagedRendererPath(rootDir, relativePath)
+    if (fallbackPath && fs.existsSync(fallbackPath)) {
+      console.error('Development renderer unavailable, falling back to local dist file.', {
+        relativePath,
+        url: url.toString(),
+        fallbackPath,
+        error: error?.stack || error?.message || error,
+      })
+      return browserWindow.loadFile(fallbackPath, { query }).catch((fallbackError) => {
+        console.error('Failed to load local dist fallback renderer page.', {
+          relativePath,
+          fallbackPath,
+          error: fallbackError?.stack || fallbackError?.message || fallbackError,
+        })
+        return browserWindow.loadURL(buildRendererLoadErrorPage(relativePath, fallbackError))
+      })
+    }
+
     console.error('Failed to load development renderer page.', {
       relativePath,
       url: url.toString(),
