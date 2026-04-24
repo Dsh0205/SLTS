@@ -216,6 +216,14 @@
       animation-delay: 0.24s;
     }
 
+    .home-view.active #homeNotebookBtn.hero-reveal.play {
+      animation-name: hero-bounce-in;
+      animation-duration: 0.48s;
+      animation-timing-function: cubic-bezier(0.2, 0.9, 0.2, 1.1);
+      animation-fill-mode: forwards;
+      animation-delay: 0.32s;
+    }
+
     @keyframes hero-rise {
       0% {
         opacity: 0;
@@ -743,12 +751,32 @@
 
     .option-btn {
       min-height: 86px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 8px;
       text-align: left;
       border-radius: 22px;
       background: white;
       color: var(--ink);
       border: 1px solid rgba(31, 41, 51, 0.08);
       box-shadow: 0 12px 18px rgba(31, 41, 51, 0.04);
+    }
+
+    .option-meaning {
+      display: block;
+      font-weight: 700;
+    }
+
+    .option-word {
+      display: none;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .option-btn.show-word .option-word {
+      display: block;
     }
 
     .option-btn.correct {
@@ -1241,8 +1269,11 @@
     .quiz-bottom-actions {
       display: flex;
       justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
+    .quiz-favorite-word-btn,
     .quiz-delete-word-btn {
       width: 54px;
       height: 54px;
@@ -1253,6 +1284,7 @@
       line-height: 1;
     }
 
+    .quiz-favorite-word-icon,
     .quiz-delete-word-icon {
       display: block;
       width: 24px;
@@ -1265,6 +1297,7 @@
       min-height: 74px;
       text-align: center;
       font-size: 1.05rem;
+      align-items: center;
     }
 
     .option-btn.option-enter {
@@ -1321,13 +1354,15 @@
     }
 
     .mode-select-shell,
-    .words-shell {
+    .words-shell,
+    .notebook-shell {
       width: min(980px, 100%);
       margin: 0 auto;
     }
 
     .mode-select-title,
-    .words-title {
+    .words-title,
+    .notebook-title {
       margin: 0 0 22px;
       text-align: center;
       font-size: clamp(2rem, 6vw, 3rem);
@@ -1341,6 +1376,12 @@
 
     .words-search-input {
       width: min(460px, 100%);
+    }
+
+    .notebook-search-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 18px;
     }
 
     .mode-select-grid {
@@ -1519,6 +1560,12 @@
       gap: 18px;
     }
 
+    .notebook-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
     .words-column {
       padding: 22px;
       border-radius: 24px;
@@ -1526,10 +1573,45 @@
       background: rgba(255, 248, 238, 0.72);
     }
 
+    .notebook-column {
+      padding: 22px;
+      border-radius: 24px;
+      border: 1px solid rgba(60, 42, 20, 0.08);
+      background: rgba(255, 248, 238, 0.72);
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
     .words-column h3 {
       margin: 0 0 14px;
       text-align: center;
       font-size: 1.2rem;
+    }
+
+    .notebook-column h3 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .notebook-column-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .notebook-column-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .notebook-status {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
     }
 
     .word-list.simple-list {
@@ -1703,6 +1785,7 @@
       .mode-select-grid,
       .library-entry-grid,
       .words-list-grid,
+      .notebook-columns,
       .group-progress-lists,
       .group-progress-stats {
         grid-template-columns: 1fr;
@@ -1747,6 +1830,12 @@
       .group-picker-actions {
         flex-direction: column;
       }
+
+      .notebook-column-header,
+      .notebook-column-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
     }
   </style>
 </head>
@@ -1766,6 +1855,12 @@
           <button id="homeLibraryBtn" class="ghost-btn hero-reveal button-with-icon" type="button">
             <img class="gif-icon" src="./img/Icons8/icons8-添加-50.gif" alt="">
             <span>单词库查询</span>
+          </button>
+          <button id="homeNotebookBtn" class="ghost-btn hero-reveal button-with-icon" type="button">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.31l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93Z" />
+            </svg>
+            <span>生词本</span>
           </button>
         </div>
       </div>
@@ -1810,6 +1905,11 @@
         </div>
 
         <div class="quiz-bottom-actions">
+          <button id="favoriteCurrentWordBtn" class="ghost-btn quiz-favorite-word-btn" type="button" aria-label="加入生词本">
+            <svg class="quiz-favorite-word-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="m12 2.75 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.31l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93Z" />
+            </svg>
+          </button>
           <button id="deleteCurrentWordBtn" class="danger-btn quiz-delete-word-btn" type="button" aria-label="删除当前单词">
             <img class="quiz-delete-word-icon" src="./img/Icons8/icons8-%E5%9E%83%E5%9C%BE%E6%A1%B6-50.png" alt="">
           </button>
@@ -1942,6 +2042,52 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="notebookView" class="view">
+      <div class="notebook-shell">
+        <div class="simple-header">
+          <button id="notebookLibraryBtn" class="ghost-btn" type="button">前往单词库</button>
+          <button id="notebookHomeBtn" class="ghost-btn" type="button">返回主页</button>
+        </div>
+
+        <h2 class="notebook-title">生词本</h2>
+        <div class="helper-note">测试时点星星即可加入生词本，右键单词可将它移出。</div>
+
+        <div class="search-box notebook-search-row">
+          <input id="notebookSearchInput" class="words-search-input" type="search" placeholder="搜索生词或释义" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="notebook-columns">
+          <div class="notebook-column">
+            <div class="notebook-column-header">
+              <div>
+                <h3>英语生词本</h3>
+                <p id="englishNotebookInfo" class="notebook-status">还没有加入任何英语生词。</p>
+              </div>
+              <div class="notebook-column-actions">
+                <button id="englishNotebookStartBtn" class="primary-btn" type="button">开始测试</button>
+              </div>
+            </div>
+            <div id="englishNotebookEmpty" class="empty-state">还没有加入任何英语生词。</div>
+            <ul id="englishNotebookList" class="word-list simple-list" hidden></ul>
+          </div>
+
+          <div class="notebook-column">
+            <div class="notebook-column-header">
+              <div>
+                <h3>俄语生词本</h3>
+                <p id="russianNotebookInfo" class="notebook-status">还没有加入任何俄语生词。</p>
+              </div>
+              <div class="notebook-column-actions">
+                <button id="russianNotebookStartBtn" class="ghost-btn" type="button">开始测试</button>
+              </div>
+            </div>
+            <div id="russianNotebookEmpty" class="empty-state">还没有加入任何俄语生词。</div>
+            <ul id="russianNotebookList" class="word-list simple-list" hidden></ul>
           </div>
         </div>
       </div>

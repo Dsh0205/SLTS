@@ -122,7 +122,17 @@ export function renderQuizOptionsUI({
     button.type = "button";
     button.className = "option-btn option-enter";
     button.style.animationDelay = String(0.08 + index * 0.08) + "s";
-    button.textContent = item.meaning;
+
+    const meaning = document.createElement("span");
+    meaning.className = "option-meaning";
+    meaning.textContent = item.meaning;
+
+    const word = document.createElement("span");
+    word.className = "option-word";
+    word.textContent = item.word;
+
+    button.appendChild(meaning);
+    button.appendChild(word);
     button.dataset.correct = String(item.correct);
     button.addEventListener("click", () => onSelect(button, item.correct));
     container.appendChild(button);
@@ -287,6 +297,45 @@ export function renderEntryRecordsUI({
       item.appendChild(badge);
     }
 
+    listElement.appendChild(item);
+  });
+}
+
+export function renderNotebookEntriesUI({
+  entries,
+  listElement,
+  emptyElement,
+  emptyText,
+  escapeHtml,
+  onDeleteEntry,
+}) {
+  listElement.innerHTML = "";
+  if (emptyText) {
+    emptyElement.textContent = emptyText;
+  }
+
+  if (!entries || entries.length === 0) {
+    listElement.hidden = true;
+    emptyElement.hidden = false;
+    return;
+  }
+
+  emptyElement.hidden = true;
+  listElement.hidden = false;
+
+  entries.forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = "deletable-word";
+    item.title = "右键将这个单词移出生词本";
+    item.innerHTML =
+      "<div class=\"word-meta\">" +
+      "<strong>" + escapeHtml(entry.word) + "</strong>" +
+      "<span>" + escapeHtml(entry.meaning) + "</span>" +
+      "</div>";
+    item.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      onDeleteEntry(entry.id);
+    });
     listElement.appendChild(item);
   });
 }

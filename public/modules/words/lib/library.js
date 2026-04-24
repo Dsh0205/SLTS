@@ -184,6 +184,7 @@ export function parseImportedWordsText(rawText, options) {
       english: normalizeImportedModePayload(parsed.wordBanks.english, englishLabel, importedGroupName),
       russian: normalizeImportedModePayload(parsed.wordBanks.russian, russianLabel, importedGroupName),
       progress: parsed.wordBanks.progress || null,
+      notebook: parsed.wordBanks.notebook || null,
     };
   }
 
@@ -192,6 +193,7 @@ export function parseImportedWordsText(rawText, options) {
       english: normalizeImportedModePayload(parsed.english, englishLabel, importedGroupName),
       russian: normalizeImportedModePayload(parsed.russian, russianLabel, importedGroupName),
       progress: parsed.progress || null,
+      notebook: parsed.notebook || null,
     };
   }
 
@@ -214,6 +216,7 @@ export function parseImportedWordsText(rawText, options) {
     }],
     russian: [],
     progress: null,
+    notebook: null,
   };
 }
 

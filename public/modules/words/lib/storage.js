@@ -1,11 +1,17 @@
 import { exportGroups, hydrateGroupsFromModePayload } from "./library.js";
+import { createEmptyWordNotebook, normalizeWordNotebook } from "./notebook.js";
 import { createEmptyWordProgress, normalizeWordProgress } from "./progress.js";
 
-export function buildWordLibraryPayload(groupsByMode, progressByMode = createEmptyWordProgress()) {
+export function buildWordLibraryPayload(
+  groupsByMode,
+  progressByMode = createEmptyWordProgress(),
+  notebookByMode = createEmptyWordNotebook(),
+) {
   return {
     english: { groups: exportGroups(groupsByMode.english || []) },
     russian: { groups: exportGroups(groupsByMode.russian || []) },
     progress: normalizeWordProgress(progressByMode),
+    notebook: normalizeWordNotebook(notebookByMode),
   };
 }
 
@@ -27,6 +33,7 @@ export function loadWordBanksFromStorage(storageKey, options) {
       english: hydrateGroupsFromModePayload(parsed.wordBanks.english, defaultGroupName, englishLabel),
       russian: hydrateGroupsFromModePayload(parsed.wordBanks.russian, defaultGroupName, russianLabel),
       progress: normalizeWordProgress(parsed.wordBanks.progress),
+      notebook: normalizeWordNotebook(parsed.wordBanks.notebook),
     };
   }
 
@@ -38,14 +45,20 @@ export function loadWordBanksFromStorage(storageKey, options) {
       }, defaultGroupName, englishLabel),
       russian: [],
       progress: createEmptyWordProgress(),
+      notebook: createEmptyWordNotebook(),
     };
   }
 
   return null;
 }
 
-export function saveWordBanksToStorage(storageKey, groupsByMode, progressByMode = createEmptyWordProgress()) {
+export function saveWordBanksToStorage(
+  storageKey,
+  groupsByMode,
+  progressByMode = createEmptyWordProgress(),
+  notebookByMode = createEmptyWordNotebook(),
+) {
   localStorage.setItem(storageKey, JSON.stringify({
-    wordBanks: buildWordLibraryPayload(groupsByMode, progressByMode),
+    wordBanks: buildWordLibraryPayload(groupsByMode, progressByMode, notebookByMode),
   }));
 }

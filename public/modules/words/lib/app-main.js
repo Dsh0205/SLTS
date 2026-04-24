@@ -1,9 +1,10 @@
 import { addEntriesToGroup, collectEntriesFromGroups as collectEntriesFromGroupsInGroups, createNamedGroup, cloneGroup as cloneGroupFromLibrary, ensureValidActiveGroupId, findEntryInGroup, findGroup as findGroupInGroups, removeEntryFromGroup, removeGroup } from "./library.js";
 import { deleteTextAtCursor as deleteTextAtCursorInInput, insertTextAtCursor as insertTextAtCursorInInput } from "./input.js";
 import { parseManualEntries as parseManualEntriesFromManual } from "./manual.js";
+import { addEntryToNotebook, createEmptyWordNotebook, hasNotebookEntry, normalizeWordNotebook, pruneWordNotebook, removeNotebookEntry } from "./notebook.js";
 import { buildGroupProgressMap, buildGroupProgressSummary, createEmptyWordProgress, getMasteredProgressKeys, getWrongProgressKeys, normalizeWordProgress, pruneWordProgress, updateWordProgress } from "./progress.js";
 import { buildOptionItems as buildOptionItemsFromQuiz, buildRoundEntries as buildRoundEntriesForRound, getEntryKey as getEntryKeyFromQuiz, getRemainingPracticeEntries as getRemainingPracticeEntriesForPractice, getWrongRecordKey as getWrongRecordKeyFromQuiz, hasNextRoundAvailable as hasNextRoundAvailableForPractice, hasSufficientQuizEntries as hasSufficientQuizEntriesFromQuiz, pickQuestionEntry as pickQuestionEntryForQuiz, shuffleArray as shuffleArrayFromQuiz } from "./quiz.js";
-import { hideRoundCelebrationUI, playRoundCompletionRevealUI, renderCelebrationEffectUI, renderGroupProgressPanelUI, renderGroupSelectorUI, renderQuizOptionsUI, renderResultStatsUI, renderRoundProgressUI, renderWordColumnUI, renderWrongRecordsUI, syncGroupSelectOptions } from "./render.js";
+import { hideRoundCelebrationUI, playRoundCompletionRevealUI, renderCelebrationEffectUI, renderGroupProgressPanelUI, renderGroupSelectorUI, renderNotebookEntriesUI, renderQuizOptionsUI, renderResultStatsUI, renderRoundProgressUI, renderWordColumnUI, renderWrongRecordsUI, syncGroupSelectOptions } from "./render.js";
 import { applyAnswerState, createClearedPracticeState, createExitedSessionState, createPreparedRoundState, createRoundMetricsResetState, createStartedSessionState } from "./session.js";
 import { playFinishPracticeSound, playRoundCompleteSound, playWrongAnswerSound } from "./sound.js";
 import { buildWordLibraryPayload as buildWordLibraryPayloadFromStorage, loadWordBanksFromStorage, saveWordBanksToStorage } from "./storage.js";
@@ -21,6 +22,7 @@ const wordBanks = {
 };
 
 let wordProgress = createEmptyWordProgress();
+let wordNotebook = createEmptyWordNotebook();
 const wrongRecords = new Map();
 
 let currentMode = "english";
@@ -28,6 +30,7 @@ let practiceEntries = [];
 let currentQuizEntries = [];
 let currentRoundPendingEntries = [];
 let currentQuestionEntry = null;
+let visibleQuestionEntry = null;
 let currentRoundSize = 0;
 let currentSelectedGroupIds = [];
 let sessionActive = false;
@@ -45,6 +48,11 @@ let pendingGroupSelection = new Set();
 let masteredEntryKeys = new Set();
 let carryOverWrongKeys = new Set();
 let wordsSearchQuery = "";
+let notebookSearchQuery = "";
+let currentPracticeSource = "library";
+let currentPracticeLabel = wordBanks.english.label;
+let lastPracticeSource = "library";
+let lastPracticeMode = "english";
 
 const activeLibraryGroupIds = {
   english: "",
@@ -79,13 +87,17 @@ const modeSelectView = document.getElementById("modeSelectView");
 const quizView = document.getElementById("quizView");
 const resultView = document.getElementById("resultView");
 const libraryView = document.getElementById("libraryView");
+const notebookView = document.getElementById("notebookView");
 const wordsView = document.getElementById("wordsView");
 
 const homeStartBtn = document.getElementById("homeStartBtn");
 const homeLibraryBtn = document.getElementById("homeLibraryBtn");
+const homeNotebookBtn = document.getElementById("homeNotebookBtn");
 const englishModeBtn = document.getElementById("englishModeBtn");
 const russianModeBtn = document.getElementById("russianModeBtn");
 const libraryHomeBtn = document.getElementById("libraryHomeBtn");
+const notebookLibraryBtn = document.getElementById("notebookLibraryBtn");
+const notebookHomeBtn = document.getElementById("notebookHomeBtn");
 const resultRestartBtn = document.getElementById("resultRestartBtn");
 const resultHomeBtn = document.getElementById("resultHomeBtn");
 const wordsBackBtn = document.getElementById("wordsBackBtn");
@@ -138,8 +150,18 @@ const russianWordsList = document.getElementById("russianWordsList");
 const englishWordsEmpty = document.getElementById("englishWordsEmpty");
 const russianWordsEmpty = document.getElementById("russianWordsEmpty");
 const wordsSearchInput = document.getElementById("wordsSearchInput");
+const notebookSearchInput = document.getElementById("notebookSearchInput");
+const englishNotebookInfo = document.getElementById("englishNotebookInfo");
+const russianNotebookInfo = document.getElementById("russianNotebookInfo");
+const englishNotebookList = document.getElementById("englishNotebookList");
+const russianNotebookList = document.getElementById("russianNotebookList");
+const englishNotebookEmpty = document.getElementById("englishNotebookEmpty");
+const russianNotebookEmpty = document.getElementById("russianNotebookEmpty");
+const englishNotebookStartBtn = document.getElementById("englishNotebookStartBtn");
+const russianNotebookStartBtn = document.getElementById("russianNotebookStartBtn");
 
 const exitBtn = document.getElementById("exitBtn");
+const favoriteCurrentWordBtn = document.getElementById("favoriteCurrentWordBtn");
 const deleteCurrentWordBtn = document.getElementById("deleteCurrentWordBtn");
 const questionWord = document.getElementById("questionWord");
 const options = document.getElementById("options");
@@ -195,14 +217,18 @@ loadSavedWords();
 syncLibrarySelectors();
 refreshAllDisplays();
 syncQuizDeleteButtonState();
+syncResultRestartButton();
 showView("home");
 
 homeStartBtn.addEventListener("click", () => showView("mode"));
 homeLibraryBtn.addEventListener("click", () => showView("library"));
+homeNotebookBtn.addEventListener("click", () => showView("notebook"));
 englishModeBtn.addEventListener("click", () => openGroupSelector("english"));
 russianModeBtn.addEventListener("click", () => openGroupSelector("russian"));
 libraryHomeBtn.addEventListener("click", () => showView("home"));
-resultRestartBtn.addEventListener("click", () => showView("mode"));
+notebookLibraryBtn.addEventListener("click", () => showView("library"));
+notebookHomeBtn.addEventListener("click", () => showView("home"));
+resultRestartBtn.addEventListener("click", restartPracticeFromResult);
 resultHomeBtn.addEventListener("click", () => showView("home"));
 wordsBackBtn.addEventListener("click", () => showView("library"));
 wordsHomeBtn.addEventListener("click", () => showView("home"));
@@ -222,8 +248,12 @@ russianCreateGroupBtn.addEventListener("click", () => createGroupFromInput("russ
 englishGroupSelect.addEventListener("change", () => setActiveLibraryGroup("english", englishGroupSelect.value));
 russianGroupSelect.addEventListener("change", () => setActiveLibraryGroup("russian", russianGroupSelect.value));
 wordsSearchInput.addEventListener("input", () => updateWordsSearchQuery(wordsSearchInput.value));
+notebookSearchInput.addEventListener("input", () => updateNotebookSearchQuery(notebookSearchInput.value));
+englishNotebookStartBtn.addEventListener("click", () => startNotebookPractice("english"));
+russianNotebookStartBtn.addEventListener("click", () => startNotebookPractice("russian"));
 
 exitBtn.addEventListener("click", finishPracticeLoop);
+favoriteCurrentWordBtn.addEventListener("click", addCurrentWordToNotebook);
 deleteCurrentWordBtn.addEventListener("click", deleteCurrentQuestionEntry);
 roundContinueBtn.addEventListener("click", continueNextRound);
 roundStopBtn.addEventListener("click", finishPracticeLoop);
@@ -244,9 +274,10 @@ function showView(viewName) {
   quizView.classList.toggle("active", viewName === "quiz");
   resultView.classList.toggle("active", viewName === "result");
   libraryView.classList.toggle("active", viewName === "library");
+  notebookView.classList.toggle("active", viewName === "notebook");
   wordsView.classList.toggle("active", viewName === "words");
 
-  if (viewName === "library" || viewName === "words") {
+  if (viewName === "library" || viewName === "words" || viewName === "notebook") {
     refreshAllDisplays();
   }
 
@@ -341,6 +372,69 @@ function refreshAllDisplays() {
   renderResultStats();
   renderRoundProgress();
   renderWordsView();
+  renderNotebookView();
+  syncResultRestartButton();
+}
+
+function setPracticeContext(source, mode) {
+  currentPracticeSource = source;
+  currentPracticeLabel = source === "notebook"
+    ? wordBanks[mode].label + "生词本"
+    : wordBanks[mode].label;
+  lastPracticeSource = source;
+  lastPracticeMode = mode;
+  syncResultRestartButton();
+}
+
+function syncResultRestartButton() {
+  resultRestartBtn.textContent = lastPracticeSource === "notebook" ? "再测生词本" : "再测一次";
+}
+
+function restartPracticeFromResult() {
+  if (lastPracticeSource === "notebook") {
+    if (!startNotebookPractice(lastPracticeMode)) {
+      showView("notebook");
+    }
+    return;
+  }
+
+  showView("mode");
+}
+
+function startNotebookPractice(mode) {
+  const entries = getNotebookEntries(mode);
+  if (entries.length === 0) {
+    showToast(wordBanks[mode].label + "生词本还是空的，先在测试里点星星收录单词。", "error");
+    showView("notebook");
+    return false;
+  }
+
+  if (!hasSufficientQuizEntriesFromQuiz(entries)) {
+    showToast(wordBanks[mode].label + "生词本里的单词还不足以开始测试，至少需要 2 个不同释义。", "error");
+    showView("notebook");
+    return false;
+  }
+
+  setPracticeContext("notebook", mode);
+  applySessionState(createStartedSessionState({
+    mode,
+    selectedGroupIds: [],
+    entries,
+    shuffleEntries: shuffleArrayFromQuiz,
+    masteredEntryKeys: new Set(),
+    carryOverWrongKeys: new Set(),
+  }));
+  setLibraryActionsDisabled(true);
+  showView("quiz");
+
+  if (!prepareNextRound()) {
+    exitQuiz();
+    showToast("生词本里可用于测试的单词不足。", "error");
+    return false;
+  }
+
+  nextQuestion();
+  return true;
 }
 
 function openGroupSelector(mode) {
@@ -439,6 +533,7 @@ function confirmGroupSelection() {
     return;
   }
 
+  setPracticeContext("library", pendingGroupMode);
   applySessionState(createStartedSessionState({
     mode: pendingGroupMode,
     selectedGroupIds,
@@ -462,6 +557,7 @@ function confirmGroupSelection() {
 }
 
 function exitQuiz() {
+  visibleQuestionEntry = null;
   applySessionState(createExitedSessionState());
   hideRoundCelebrationUI({
     overlayElement: roundCompleteOverlay,
@@ -497,6 +593,7 @@ function prepareNextRound() {
 
 function resetRoundSession() {
   wrongRecords.clear();
+  visibleQuestionEntry = null;
   applySessionState(createRoundMetricsResetState());
   options.innerHTML = "";
   renderWrongRecords();
@@ -516,6 +613,7 @@ function nextQuestion() {
 
   playQuestionReveal();
   currentQuestionEntry = pickQuestionEntryForQuiz(currentRoundPendingEntries, lastQuestionKey);
+  visibleQuestionEntry = currentQuestionEntry;
   lastQuestionKey = getEntryKeyFromQuiz(currentQuestionEntry);
   questionWord.textContent = currentQuestionEntry.word;
 
@@ -539,6 +637,7 @@ function handleOptionClick(button, isCorrect) {
   const optionButtons = Array.from(document.querySelectorAll(".option-btn"));
   optionButtons.forEach((btn) => {
     btn.disabled = true;
+    btn.classList.add("show-word");
   });
 
   const correctButton = optionButtons.find((btn) => btn.dataset.correct === "true");
@@ -625,7 +724,7 @@ function renderResultStats() {
     answeredCountValue,
     correctCountValue,
     wrongCountValue,
-    resultLabel: wordBanks[currentMode].label,
+    resultLabel: currentPracticeLabel,
   });
 }
 
@@ -817,7 +916,9 @@ function clearWords() {
   resetBank("english");
   resetBank("russian");
   wordProgress = createEmptyWordProgress();
+  wordNotebook = createEmptyWordNotebook();
   wrongRecords.clear();
+  visibleQuestionEntry = null;
   applySessionState(createClearedPracticeState());
   activeLibraryGroupIds.english = "";
   activeLibraryGroupIds.russian = "";
@@ -826,6 +927,43 @@ function clearWords() {
 }
 
 function renderWordsView() { renderWordColumn("english", englishWordsList, englishWordsEmpty); renderWordColumn("russian", russianWordsList, russianWordsEmpty); }
+
+function renderNotebookView() {
+  renderNotebookColumn("english", {
+    infoElement: englishNotebookInfo,
+    listElement: englishNotebookList,
+    emptyElement: englishNotebookEmpty,
+    startButton: englishNotebookStartBtn,
+  });
+  renderNotebookColumn("russian", {
+    infoElement: russianNotebookInfo,
+    listElement: russianNotebookList,
+    emptyElement: russianNotebookEmpty,
+    startButton: russianNotebookStartBtn,
+  });
+}
+
+function renderNotebookColumn(mode, { infoElement, listElement, emptyElement, startButton }) {
+  const entries = getFilteredNotebookEntries(mode);
+  const totalEntries = getNotebookEntries(mode);
+  const sortedEntries = entries
+    .slice()
+    .sort((left, right) => left.word.localeCompare(right.word, wordBanks[mode].locale));
+
+  infoElement.textContent = getNotebookInfoText(mode, totalEntries);
+  startButton.disabled = sessionActive || !hasSufficientQuizEntriesFromQuiz(totalEntries);
+
+  renderNotebookEntriesUI({
+    entries: sortedEntries,
+    listElement,
+    emptyElement,
+    emptyText: getNotebookEmptyText(mode),
+    escapeHtml,
+    onDeleteEntry(entryId) {
+      deleteNotebookEntry(mode, entryId);
+    },
+  });
+}
 
 function renderWordColumn(mode, listElement, emptyElement) {
   emptyElement.textContent = getWordsEmptyText(mode);
@@ -867,6 +1005,54 @@ function deleteWordEntry(mode, groupId, entryId) {
   showToast("Deleted 1 " + getModeLabel(mode) + " entry.", "success");
 }
 
+function addCurrentWordToNotebook() {
+  const entry = visibleQuestionEntry || currentQuestionEntry;
+  if (!sessionActive || roundCelebrationVisible || !entry) {
+    return;
+  }
+
+  if (hasNotebookEntry(wordNotebook, currentMode, entry)) {
+    showToast("这个单词已经在生词本里了。", "error");
+    return;
+  }
+
+  const result = addEntryToNotebook(wordNotebook, currentMode, entry);
+  if (!result.added) {
+    showToast("这个单词已经在生词本里了。", "error");
+    return;
+  }
+
+  persistLibraryState({ skipRefresh: true });
+  renderNotebookView();
+  showToast("已加入" + getModeLabel(currentMode) + "生词本。", "success");
+}
+
+function deleteNotebookEntry(mode, entryId) {
+  if (blockIfSessionActive("editing the notebook")) {
+    return;
+  }
+
+  const targetEntry = getNotebookEntries(mode).find((entry) => entry.id === entryId);
+  if (!targetEntry) {
+    showToast("生词本里的这个单词没有找到。", "error");
+    return;
+  }
+
+  const confirmed = window.confirm("要将这个单词移出生词本吗？\n\n" + targetEntry.word + " - " + targetEntry.meaning);
+  if (!confirmed) {
+    return;
+  }
+
+  const { removed } = removeNotebookEntry(wordNotebook, mode, entryId);
+  if (!removed) {
+    showToast("生词本里的这个单词没有找到。", "error");
+    return;
+  }
+
+  persistLibraryState();
+  showToast("已将单词移出生词本。", "success");
+}
+
 function deleteCurrentQuestionEntry() {
   if (!sessionActive || transitionLock || roundCelebrationVisible || !currentQuestionEntry) {
     return;
@@ -898,6 +1084,7 @@ function deleteCurrentQuestionEntry() {
   nextMasteredEntryKeys.delete(entryKey);
   nextCarryOverWrongKeys.delete(entryKey);
   wrongRecords.delete(getWrongRecordKeyFromQuiz(entry));
+  visibleQuestionEntry = null;
 
   const canContinueCurrentRound =
     nextCurrentRoundPendingEntries.length > 0 &&
@@ -974,6 +1161,10 @@ function loadSavedWords() {
       normalizeWordProgress(groupsByMode.progress),
       { english: groupsByMode.english, russian: groupsByMode.russian }
     );
+    wordNotebook = pruneWordNotebook(
+      normalizeWordNotebook(groupsByMode.notebook),
+      { english: groupsByMode.english, russian: groupsByMode.russian }
+    );
   } catch (error) {
     console.warn("Failed to load word library:", error);
   } finally {
@@ -1046,7 +1237,9 @@ function setLibraryActionsDisabled(disabled) {
     englishGroupNameInput,
     russianGroupNameInput,
     englishGroupSelect,
-    russianGroupSelect
+    russianGroupSelect,
+    englishNotebookStartBtn,
+    russianNotebookStartBtn
   ].forEach((element) => {
     element.disabled = disabled;
   });
@@ -1061,6 +1254,8 @@ function resetBank(mode) { wordBanks[mode].groups = []; }
 function collectEntriesFromGroups(mode, groupIds) { return collectEntriesFromGroupsInGroups(getGroups(mode), groupIds); }
 
 function getGroups(mode) { return wordBanks[mode].groups; }
+
+function getNotebookEntries(mode) { return wordNotebook[mode]; }
 
 function getGroupProgressMapForMode(mode) {
   return buildGroupProgressMap(getGroups(mode), wordProgress, mode);
@@ -1095,6 +1290,18 @@ function getFilteredGroupsForWordsView(mode) {
     .filter(Boolean);
 }
 
+function getFilteredNotebookEntries(mode) {
+  const entries = getNotebookEntries(mode);
+  if (!notebookSearchQuery) {
+    return entries;
+  }
+
+  return entries.filter((entry) => (
+    normalizeSearchQuery(entry.word).includes(notebookSearchQuery) ||
+    normalizeSearchQuery(entry.meaning).includes(notebookSearchQuery)
+  ));
+}
+
 function matchesWordsSearch(group, entry) {
   return (
     normalizeSearchQuery(group.name).includes(wordsSearchQuery) ||
@@ -1113,9 +1320,36 @@ function getWordsEmptyText(mode) {
     : "\u4fc4\u8bed\u8bcd\u5e93\u8fd8\u662f\u7a7a\u7684\u3002";
 }
 
+function getNotebookEmptyText(mode) {
+  if (notebookSearchQuery) {
+    return getModeLabel(mode) + "生词本里没有找到匹配的单词。";
+  }
+
+  return mode === "english"
+    ? "还没有加入任何英语生词，测试时点星星就会收进来。"
+    : "还没有加入任何俄语生词，测试时点星星就会收进来。";
+}
+
+function getNotebookInfoText(mode, entries) {
+  if (entries.length === 0) {
+    return "还没有加入任何" + getModeLabel(mode) + "生词。";
+  }
+
+  if (!hasSufficientQuizEntriesFromQuiz(entries)) {
+    return "共 " + entries.length + " 个生词，还需要至少 2 个不同释义才能开始测试。";
+  }
+
+  return "共 " + entries.length + " 个生词，可以直接开始测试。";
+}
+
 function updateWordsSearchQuery(value) {
   wordsSearchQuery = normalizeSearchQuery(value);
   renderWordsView();
+}
+
+function updateNotebookSearchQuery(value) {
+  notebookSearchQuery = normalizeSearchQuery(value);
+  renderNotebookView();
 }
 
 function normalizeSearchQuery(value) {
@@ -1123,6 +1357,10 @@ function normalizeSearchQuery(value) {
 }
 
 function syncQuizDeleteButtonState() {
+  favoriteCurrentWordBtn.disabled =
+    !sessionActive ||
+    roundCelebrationVisible ||
+    !(visibleQuestionEntry || currentQuestionEntry);
   deleteCurrentWordBtn.disabled =
     !sessionActive ||
     transitionLock ||
@@ -1164,12 +1402,17 @@ function replaceWordLibrary(payload) {
   resetBank("english");
   resetBank("russian");
   wrongRecords.clear();
+  visibleQuestionEntry = null;
   applySessionState(createClearedPracticeState());
 
   wordBanks.english.groups = payload.english.map(cloneGroupFromLibrary);
   wordBanks.russian.groups = payload.russian.map(cloneGroupFromLibrary);
   wordProgress = pruneWordProgress(
     normalizeWordProgress(payload.progress),
+    { english: wordBanks.english.groups, russian: wordBanks.russian.groups }
+  );
+  wordNotebook = pruneWordNotebook(
+    normalizeWordNotebook(payload.notebook),
     { english: wordBanks.english.groups, russian: wordBanks.russian.groups }
   );
 
@@ -1265,7 +1508,7 @@ function buildCurrentLibraryPayload() {
   return buildWordLibraryPayloadFromStorage({
     english: getGroups("english"),
     russian: getGroups("russian"),
-  }, wordProgress);
+  }, wordProgress, wordNotebook);
 }
 
 async function exportWordsToFile() {
@@ -1287,10 +1530,14 @@ function persistLibraryState(options = {}) {
     english: getGroups("english"),
     russian: getGroups("russian"),
   });
+  wordNotebook = pruneWordNotebook(wordNotebook, {
+    english: getGroups("english"),
+    russian: getGroups("russian"),
+  });
   saveWordBanksToStorage(STORAGE_KEY, {
     english: getGroups("english"),
     russian: getGroups("russian"),
-  }, wordProgress);
+  }, wordProgress, wordNotebook);
 
   if (!options.skipRefresh) {
     refreshAllDisplays();

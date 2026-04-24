@@ -47,6 +47,7 @@ export function pickQuestionEntry(entries, lastQuestionKey) {
 export function buildOptionItems(entries, correctEntry) {
   const targetOptionCount = Math.max(2, Math.min(4, getUniqueMeaningCount(entries)));
   const optionItems = [{
+    word: correctEntry.word,
     meaning: correctEntry.meaning,
     correct: true,
   }];
@@ -54,13 +55,15 @@ export function buildOptionItems(entries, correctEntry) {
 
   while (optionItems.length < targetOptionCount) {
     const randomIndex = Math.floor(Math.random() * entries.length);
-    const meaning = entries[randomIndex].meaning;
+    const candidate = entries[randomIndex];
+    const meaning = candidate.meaning;
     if (usedMeanings.has(meaning)) {
       continue;
     }
 
     usedMeanings.add(meaning);
     optionItems.push({
+      word: candidate.word,
       meaning,
       correct: false,
     });
