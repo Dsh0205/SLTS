@@ -5,7 +5,10 @@ import {
   formatHour,
   getBoxById,
   getTimelineMarks,
+  normalizeLinkMarker,
+  normalizeLinkStroke,
 } from "./board-state.js";
+import { buildBoxShapeModel, getBoxTextBounds as getSharedBoxTextBounds } from "./board-shapes.js";
 
 const MONO_TEXT = "rgba(255,255,255,0.92)";
 const MONO_MUTED = "rgba(255,255,255,0.58)";
@@ -102,10 +105,15 @@ function drawLinks(context, state) {
 
     const geometry = geometryById.get(link.id);
     if (!geometry) return;
+    const stroke = normalizeLinkStroke(link.stroke);
+    const marker = normalizeLinkMarker(link.marker);
+
+    context.save();
     context.strokeStyle = MONO_STROKE_STRONG;
     context.lineWidth = 2.6;
     context.lineCap = "round";
     context.lineJoin = "miter";
+    context.setLineDash(stroke === "dashed" ? [10, 7] : []);
     context.beginPath();
     geometry.points.forEach((point, index) => {
       if (!index) {
@@ -115,7 +123,10 @@ function drawLinks(context, state) {
       }
     });
     context.stroke();
-    drawArrowHead(context, geometry.end, geometry.arrowFrom);
+    if (marker !== "none") {
+      drawArrowHead(context, geometry.end, geometry.arrowFrom);
+    }
+    context.restore();
   });
 }
 
@@ -249,133 +260,34 @@ function drawBox(context, box) {
 }
 
 function drawFlowchartShape(context, box, fillStyle, strokeStyle) {
-  const shape = box.shape || DEFAULT_BOX_SHAPE;
+  const model = buildBoxShapeModel(box.shape, box.width, box.height);
+  drawShapeModel(context, box.x, box.y, model, fillStyle, strokeStyle);
+}
 
-  switch (shape) {
-    case "terminator":
-      drawRoundedRect(context, box.x, box.y, box.width, box.height, Math.min(box.height / 2, box.width / 2), fillStyle, strokeStyle);
-      break;
-    case "document":
-      drawDocument(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      break;
-    case "decision":
-      drawPolygon(context, diamondPoints(box.x, box.y, box.width, box.height), fillStyle, strokeStyle);
-      break;
-    case "connector":
-      drawCircle(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      break;
-    case "off-page-connector":
-      drawPolygon(context, [
-        [box.x + box.width * 0.1, box.y],
-        [box.x + box.width * 0.9, box.y],
-        [box.x + box.width * 0.9, box.y + box.height * 0.64],
-        [box.x + box.width * 0.5, box.y + box.height],
-        [box.x + box.width * 0.1, box.y + box.height * 0.64],
-      ], fillStyle, strokeStyle);
-      break;
-    case "input-output":
-      drawPolygon(context, [
-        [box.x + 18, box.y],
-        [box.x + box.width, box.y],
-        [box.x + box.width - 18, box.y + box.height],
-        [box.x, box.y + box.height],
-      ], fillStyle, strokeStyle);
-      break;
-    case "comment":
-      drawComment(context, box.x, box.y, box.width, box.height, strokeStyle);
-      break;
-    case "database":
-      drawDatabase(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      break;
-    case "paper-tape":
-      drawPaperTape(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      break;
-    case "summing-junction":
-      drawCircle(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      drawXMark(context, box.x, box.y, box.width, box.height, MONO_STROKE_STRONG);
-      break;
-    case "predefined-process":
-      drawRoundedRect(context, box.x, box.y, box.width, box.height, 12, fillStyle, strokeStyle);
-      drawVerticalMarkers(context, box.x, box.y, box.width, box.height, strokeStyle);
-      break;
-    case "internal-storage":
-      drawRoundedRect(context, box.x, box.y, box.width, box.height, 12, fillStyle, strokeStyle);
-      drawInternalStorageMarkers(context, box.x, box.y, box.width, box.height, strokeStyle);
-      break;
-    case "manual-input":
-      drawPolygon(context, [
-        [box.x, box.y + box.height * 0.18],
-        [box.x + box.width, box.y],
-        [box.x + box.width, box.y + box.height],
-        [box.x, box.y + box.height],
-      ], fillStyle, strokeStyle);
-      break;
-    case "manual-operation":
-      drawPolygon(context, [
-        [box.x + box.width * 0.1, box.y],
-        [box.x + box.width * 0.9, box.y],
-        [box.x + box.width, box.y + box.height],
-        [box.x, box.y + box.height],
-      ], fillStyle, strokeStyle);
-      break;
-    case "merge":
-      drawPolygon(context, [
-        [box.x + box.width * 0.5, box.y + box.height],
-        [box.x + box.width, box.y],
-        [box.x, box.y],
-      ], fillStyle, strokeStyle);
-      break;
-    case "multiple-documents":
-      drawDocument(context, box.x + 10, box.y - 8, box.width, box.height, "rgba(8,8,10,0.42)", "rgba(255,255,255,0.18)");
-      drawDocument(context, box.x + 5, box.y - 4, box.width, box.height, "rgba(8,8,10,0.54)", "rgba(255,255,255,0.24)");
-      drawDocument(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      break;
-    case "preparation":
-      drawPolygon(context, [
-        [box.x + box.width * 0.14, box.y],
-        [box.x + box.width * 0.86, box.y],
-        [box.x + box.width, box.y + box.height * 0.5],
-        [box.x + box.width * 0.86, box.y + box.height],
-        [box.x + box.width * 0.14, box.y + box.height],
-        [box.x, box.y + box.height * 0.5],
-      ], fillStyle, strokeStyle);
-      break;
-    case "stored-data":
-      drawPolygon(context, [
-        [box.x + box.width * 0.14, box.y],
-        [box.x + box.width, box.y],
-        [box.x + box.width * 0.86, box.y + box.height * 0.5],
-        [box.x + box.width, box.y + box.height],
-        [box.x + box.width * 0.14, box.y + box.height],
-        [box.x, box.y + box.height * 0.5],
-      ], fillStyle, strokeStyle);
-      break;
-    case "delay":
-      drawDelay(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      break;
-    case "or":
-      drawCircle(context, box.x, box.y, box.width, box.height, fillStyle, strokeStyle);
-      drawPlusMark(context, box.x, box.y, box.width, box.height, MONO_STROKE_STRONG);
-      break;
-    case "display":
-      drawPolygon(context, [
-        [box.x, box.y + box.height * 0.14],
-        [box.x + box.width * 0.78, box.y + box.height * 0.14],
-        [box.x + box.width, box.y + box.height * 0.5],
-        [box.x + box.width * 0.78, box.y + box.height * 0.86],
-        [box.x, box.y + box.height * 0.86],
-        [box.x + box.width * 0.08, box.y + box.height * 0.5],
-      ], fillStyle, strokeStyle);
-      break;
-    case "hard-disk":
-      drawRoundedRect(context, box.x, box.y, box.width, box.height, Math.min(box.height / 2, box.width / 2), fillStyle, strokeStyle);
-      drawHardDiskLines(context, box.x, box.y, box.width, box.height, strokeStyle);
-      break;
-    case "process":
-    default:
-      drawRoundedRect(context, box.x, box.y, box.width, box.height, 12, fillStyle, strokeStyle);
-      break;
+function drawShapeModel(context, offsetX, offsetY, model, fillStyle, strokeStyle) {
+  context.save();
+  context.translate(offsetX, offsetY);
+
+  const outline = new Path2D(model.outlineD);
+  if (fillStyle) {
+    context.fillStyle = fillStyle;
+    context.fill(outline);
   }
+  if (strokeStyle) {
+    context.strokeStyle = strokeStyle;
+    context.lineWidth = 1.4;
+    context.stroke(outline);
+  }
+
+  model.accents.forEach((accent) => {
+    const path = new Path2D(accent.d);
+    context.strokeStyle = strokeStyle;
+    context.lineWidth = accent.lineWidth || 1.2;
+    context.globalAlpha = Number.isFinite(accent.opacity) ? accent.opacity : 1;
+    context.stroke(path);
+  });
+
+  context.restore();
 }
 
 function drawComment(context, x, y, width, height, strokeStyle) {
@@ -563,70 +475,7 @@ function diamondPoints(x, y, width, height) {
 }
 
 function getBoxTextBounds(box) {
-  const shape = box.shape || DEFAULT_BOX_SHAPE;
-
-  switch (shape) {
-    case "terminator":
-      return bounds(box, 26, 16, 26, 16);
-    case "document":
-      return bounds(box, 18, 14, 18, 34);
-    case "decision":
-      return {
-        x: box.x + box.width * 0.23,
-        y: box.y + box.height * 0.24,
-        width: box.width * 0.54,
-        height: box.height * 0.5,
-      };
-    case "connector":
-    case "or":
-    case "summing-junction":
-      return {
-        x: box.x + box.width * 0.22,
-        y: box.y + box.height * 0.22,
-        width: box.width * 0.56,
-        height: box.height * 0.56,
-      };
-    case "off-page-connector":
-      return bounds(box, 18, 14, 18, 34);
-    case "input-output":
-      return bounds(box, 28, 16, 28, 16);
-    case "comment":
-      return bounds(box, 48, 18, 16, 18);
-    case "database":
-      return bounds(box, 24, 24, 24, 22);
-    case "paper-tape":
-      return bounds(box, 18, 18, 18, 18);
-    case "predefined-process":
-      return bounds(box, 34, 16, 34, 16);
-    case "internal-storage":
-      return bounds(box, 34, 24, 16, 16);
-    case "manual-input":
-      return bounds(box, 18, 22, 18, 16);
-    case "manual-operation":
-      return bounds(box, 24, 18, 24, 16);
-    case "merge":
-      return {
-        x: box.x + box.width * 0.23,
-        y: box.y + box.height * 0.12,
-        width: box.width * 0.54,
-        height: box.height * 0.42,
-      };
-    case "multiple-documents":
-      return bounds(box, 18, 14, 18, 34);
-    case "preparation":
-      return bounds(box, 34, 18, 34, 16);
-    case "stored-data":
-      return bounds(box, 36, 18, 24, 16);
-    case "delay":
-      return bounds(box, 28, 18, 30, 16);
-    case "display":
-      return bounds(box, 28, 18, 34, 16);
-    case "hard-disk":
-      return bounds(box, 24, 18, 24, 18);
-    case "process":
-    default:
-      return bounds(box, 18, 14, 18, 14);
-  }
+  return getSharedBoxTextBounds(box);
 }
 
 function bounds(box, left, top, right, bottom) {

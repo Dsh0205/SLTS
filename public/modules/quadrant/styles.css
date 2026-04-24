@@ -3,6 +3,7 @@
   --text: #f5f4ef;
   --muted: rgba(255, 255, 255, 0.58);
   --accent: #ffffff;
+  --toolbar-bg: rgba(10, 10, 12, 0.82);
   --note-bg: rgba(8, 8, 10, 0.96);
   --note-text: rgba(255, 255, 255, 0.92);
   --box-bg: rgba(8, 8, 10, 0.96);
@@ -71,10 +72,37 @@ button {
     radial-gradient(circle at right bottom, rgba(255, 255, 255, 0.05), transparent 28%);
 }
 
-.board-toolbar {
+.board-brand {
   position: absolute;
   top: 14px;
-  right: 14px;
+  left: 14px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.26);
+}
+
+.board-brand-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+}
+
+.board-brand strong {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.board-toolbar {
+  position: absolute;
   z-index: 20;
   display: inline-flex;
   align-items: center;
@@ -82,9 +110,54 @@ button {
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
-  background: rgba(10, 10, 12, 0.8);
+  background: var(--toolbar-bg);
   backdrop-filter: blur(18px);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.26);
+}
+
+.board-toolbar--creation {
+  top: 92px;
+  left: 14px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.board-toolbar--creation .tool-divider {
+  width: 100%;
+  height: 1px;
+}
+
+.board-toolbar--app {
+  top: 14px;
+  right: 14px;
+}
+
+.board-toolbar--zoom {
+  right: 14px;
+  bottom: 68px;
+}
+
+.link-toolbar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 21;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.26);
+  transform: translate(-50%, calc(-100% - 14px));
+}
+
+.link-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tool-btn {
@@ -96,8 +169,11 @@ button {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
 .tool-btn:hover {
@@ -106,12 +182,41 @@ button {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.tool-btn span {
+  pointer-events: none;
+}
+
+.tool-btn.is-active {
+  border-color: rgba(255, 255, 255, 0.56);
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.tool-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.tool-btn:disabled:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+}
+
 .tool-btn--label {
   width: auto;
   min-width: 52px;
   padding: 0 10px;
   font-size: 12px;
   letter-spacing: 0.08em;
+}
+
+.tool-btn--mini {
+  width: 34px;
+  height: 34px;
+  font-size: 11px;
+  letter-spacing: 0;
 }
 
 .tool-btn--danger {
@@ -127,14 +232,14 @@ button {
 
 .board-status {
   position: absolute;
-  right: 14px;
+  left: 14px;
   bottom: 14px;
   z-index: 20;
-  max-width: min(560px, calc(100vw - 48px));
+  max-width: min(560px, calc(100vw - 170px));
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 10, 12, 0.78);
+  background: var(--toolbar-bg);
   color: var(--muted);
   font-size: 12px;
   backdrop-filter: blur(18px);
@@ -168,6 +273,20 @@ button {
   inset: 0;
   overflow: auto;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.board-stage.is-hand-mode .board-viewport,
+.board-stage.is-space-panning .board-viewport {
+  cursor: grab;
+}
+
+.board-stage.is-arrow-mode .diagram-box,
+.board-stage.is-arrow-mode .diagram-box * {
+  cursor: crosshair;
+}
+
+.board-stage.is-panning .board-viewport {
+  cursor: grabbing;
 }
 
 .board-world-sizer {
@@ -227,6 +346,12 @@ button {
 .links-layer .link-path.is-selected {
   stroke-width: 3.4;
   filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.22));
+}
+
+.links-layer .link-path--draft {
+  stroke-dasharray: 10 7;
+  opacity: 0.74;
+  pointer-events: none;
 }
 
 .links-layer marker path {
@@ -404,15 +529,31 @@ button {
   user-select: none;
 }
 
-.diagram-box-surface {
+.diagram-box-figure {
   position: absolute;
   inset: 0;
   z-index: 1;
-  border: 1px solid var(--box-line);
-  border-radius: 12px;
-  background: var(--box-bg);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.22));
+}
+
+.diagram-box-outline {
+  fill: var(--box-bg);
+  stroke: var(--box-line);
+  stroke-width: 1.3;
+  vector-effect: non-scaling-stroke;
+}
+
+.diagram-box-accent {
+  fill: none;
+  stroke: var(--box-line);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .diagram-box-content {
@@ -428,349 +569,34 @@ button {
   text-align: center;
 }
 
-.diagram-box.is-selected .diagram-box-surface {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 20px 40px rgba(0, 0, 0, 0.28);
+.diagram-box.is-selected .diagram-box-figure {
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.28));
 }
 
-.diagram-box.is-link-source .diagram-box-surface {
-  border-color: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24), 0 20px 38px rgba(0, 0, 0, 0.3);
+.diagram-box.is-selected .diagram-box-outline {
+  stroke: rgba(255, 255, 255, 0.76);
 }
 
-.diagram-box--terminator .diagram-box-surface {
-  border-radius: 999px;
+.diagram-box.is-selected .diagram-box-accent {
+  stroke: rgba(255, 255, 255, 0.7);
 }
 
-.diagram-box--document .diagram-box-surface {
-  border-radius: 12px 12px 22px 22px / 12px 12px 30px 30px;
+.diagram-box.is-connector-source .diagram-box-figure {
+  filter: drop-shadow(0 20px 38px rgba(0, 0, 0, 0.3));
 }
 
-.diagram-box--document .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 10px;
-  height: 16px;
-  border-bottom: 2px solid var(--box-line);
-  border-radius: 0 0 50% 50%;
+.diagram-box.is-connector-source .diagram-box-outline,
+.diagram-box.is-connector-source .diagram-box-accent {
+  stroke: rgba(255, 255, 255, 0.92);
 }
 
-.diagram-box--decision .diagram-box-surface {
-  inset: 10px 22px;
-  border-radius: 14px;
-  transform: rotate(45deg);
+.diagram-box.is-connector-target .diagram-box-figure {
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.26));
 }
 
-.diagram-box--decision .diagram-box-content {
-  padding: 24px 48px 28px;
-}
-
-.diagram-box--connector .diagram-box-surface,
-.diagram-box--or .diagram-box-surface,
-.diagram-box--summing-junction .diagram-box-surface {
-  border-radius: 50%;
-}
-
-.diagram-box--connector .diagram-box-content,
-.diagram-box--or .diagram-box-content,
-.diagram-box--summing-junction .diagram-box-content {
-  padding: 22px;
-}
-
-.diagram-box--off-page-connector .diagram-box-surface {
-  clip-path: polygon(10% 0, 90% 0, 90% 64%, 50% 100%, 10% 64%);
-}
-
-.diagram-box--off-page-connector .diagram-box-content {
-  padding: 14px 20px 34px;
-}
-
-.diagram-box--input-output .diagram-box-surface {
-  inset: 0 12px;
-  transform: skewX(-16deg);
-}
-
-.diagram-box--input-output .diagram-box-content {
-  padding: 16px 34px 24px 38px;
-}
-
-.diagram-box--comment .diagram-box-surface {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
-
-.diagram-box--comment .diagram-box-surface::before {
-  content: "";
-  position: absolute;
-  left: 16px;
-  top: 12px;
-  bottom: 12px;
-  width: 2px;
-  background: var(--box-line-strong);
-}
-
-.diagram-box--comment .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 16px;
-  top: 12px;
-  width: 24px;
-  height: calc(100% - 24px);
-  border-top: 2px solid var(--box-line-strong);
-  border-bottom: 2px solid var(--box-line-strong);
-}
-
-.diagram-box--comment .diagram-box-content {
-  justify-content: flex-start;
-  text-align: left;
-  padding: 18px 16px 22px 48px;
-}
-
-.diagram-box--database .diagram-box-surface {
-  border-radius: 999px / 18px;
-}
-
-.diagram-box--database .diagram-box-surface::before,
-.diagram-box--database .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  height: 14px;
-  border: 1px solid var(--box-line);
-  border-radius: 999px / 14px;
-}
-
-.diagram-box--database .diagram-box-surface::before {
-  top: 10px;
-  border-bottom: 0;
-}
-
-.diagram-box--database .diagram-box-surface::after {
-  bottom: 10px;
-  border-top: 0;
-  opacity: 0.55;
-}
-
-.diagram-box--database .diagram-box-content {
-  padding: 24px 22px 28px;
-}
-
-.diagram-box--paper-tape .diagram-box-surface {
-  border-radius: 18px;
-}
-
-.diagram-box--paper-tape .diagram-box-surface::before,
-.diagram-box--paper-tape .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.diagram-box--paper-tape .diagram-box-surface::before {
-  top: 6px;
-  border-top: 2px solid var(--box-line);
-}
-
-.diagram-box--paper-tape .diagram-box-surface::after {
-  bottom: 6px;
-  border-bottom: 2px solid var(--box-line);
-}
-
-.diagram-box--summing-junction .diagram-box-surface::before,
-.diagram-box--summing-junction .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 20%;
-  right: 20%;
-  top: 50%;
-  height: 2px;
-  background: var(--box-line-strong);
-  transform-origin: center;
-}
-
-.diagram-box--summing-junction .diagram-box-surface::before {
-  transform: rotate(45deg);
-}
-
-.diagram-box--summing-junction .diagram-box-surface::after {
-  transform: rotate(-45deg);
-}
-
-.diagram-box--predefined-process .diagram-box-surface::before,
-.diagram-box--predefined-process .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  top: 14px;
-  bottom: 14px;
-  width: 2px;
-  background: var(--box-line);
-}
-
-.diagram-box--predefined-process .diagram-box-surface::before {
-  left: 18px;
-}
-
-.diagram-box--predefined-process .diagram-box-surface::after {
-  right: 18px;
-}
-
-.diagram-box--predefined-process .diagram-box-content {
-  padding: 16px 36px 24px;
-}
-
-.diagram-box--internal-storage .diagram-box-surface::before,
-.diagram-box--internal-storage .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  background: var(--box-line);
-}
-
-.diagram-box--internal-storage .diagram-box-surface::before {
-  left: 18px;
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-}
-
-.diagram-box--internal-storage .diagram-box-surface::after {
-  left: 10px;
-  right: 10px;
-  top: 16px;
-  height: 2px;
-}
-
-.diagram-box--internal-storage .diagram-box-content {
-  padding: 26px 18px 24px 34px;
-}
-
-.diagram-box--manual-input .diagram-box-surface {
-  clip-path: polygon(0 18%, 100% 0, 100% 100%, 0 100%);
-}
-
-.diagram-box--manual-input .diagram-box-content {
-  padding: 22px 18px 24px;
-}
-
-.diagram-box--manual-operation .diagram-box-surface {
-  clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%);
-}
-
-.diagram-box--manual-operation .diagram-box-content {
-  padding: 18px 24px 24px;
-}
-
-.diagram-box--merge .diagram-box-surface {
-  clip-path: polygon(50% 100%, 100% 0, 0 0);
-}
-
-.diagram-box--merge .diagram-box-content {
-  align-items: flex-start;
-  padding: 18px 44px 42px;
-}
-
-.diagram-box--multiple-documents::before,
-.diagram-box--multiple-documents::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px 12px 22px 22px / 12px 12px 30px 30px;
-  background: rgba(8, 8, 10, 0.5);
-  pointer-events: none;
-}
-
-.diagram-box--multiple-documents::before {
-  transform: translate(12px, -10px);
-}
-
-.diagram-box--multiple-documents::after {
-  transform: translate(6px, -5px);
-}
-
-.diagram-box--multiple-documents .diagram-box-content {
-  z-index: 3;
-}
-
-.diagram-box--preparation .diagram-box-surface {
-  clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
-}
-
-.diagram-box--preparation .diagram-box-content {
-  padding: 18px 34px 24px;
-}
-
-.diagram-box--stored-data .diagram-box-surface {
-  clip-path: polygon(14% 0, 100% 0, 86% 50%, 100% 100%, 14% 100%, 0 50%);
-}
-
-.diagram-box--stored-data .diagram-box-content {
-  padding: 18px 30px 24px 38px;
-}
-
-.diagram-box--delay .diagram-box-surface {
-  inset: 0 0 0 8px;
-  border-radius: 0 999px 999px 0 / 0 50% 50% 0;
-}
-
-.diagram-box--delay .diagram-box-content {
-  padding: 18px 30px 24px 28px;
-}
-
-.diagram-box--or .diagram-box-surface::before,
-.diagram-box--or .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  background: var(--box-line-strong);
-  transform: translate(-50%, -50%);
-}
-
-.diagram-box--or .diagram-box-surface::before {
-  width: 2px;
-  height: 48%;
-}
-
-.diagram-box--or .diagram-box-surface::after {
-  width: 48%;
-  height: 2px;
-}
-
-.diagram-box--display .diagram-box-surface {
-  clip-path: polygon(0 14%, 78% 14%, 100% 50%, 78% 86%, 0 86%, 8% 50%);
-}
-
-.diagram-box--display .diagram-box-content {
-  padding: 18px 36px 24px 28px;
-}
-
-.diagram-box--hard-disk .diagram-box-surface {
-  border-radius: 999px / 26px;
-}
-
-.diagram-box--hard-disk .diagram-box-surface::before,
-.diagram-box--hard-disk .diagram-box-surface::after {
-  content: "";
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  height: 2px;
-  background: var(--box-line);
-}
-
-.diagram-box--hard-disk .diagram-box-surface::before {
-  top: 30%;
-}
-
-.diagram-box--hard-disk .diagram-box-surface::after {
-  bottom: 30%;
+.diagram-box.is-connector-target .diagram-box-outline,
+.diagram-box.is-connector-target .diagram-box-accent {
+  stroke: rgba(255, 255, 255, 0.74);
 }
 
 .node-body {
@@ -790,11 +616,6 @@ button {
   justify-content: center;
   width: 100%;
   text-align: center;
-}
-
-.diagram-box--comment .node-body {
-  justify-content: flex-start;
-  text-align: left;
 }
 
 .node-placeholder {
@@ -827,10 +648,6 @@ button {
 
 .diagram-box .node-editor {
   text-align: center;
-}
-
-.diagram-box--comment .node-editor {
-  text-align: left;
 }
 
 .node-editor::placeholder {
@@ -967,15 +784,48 @@ button {
 }
 
 .context-menu-btn--shape {
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 12px;
-  text-align: center;
+  text-align: left;
 }
 
 .context-menu-btn--shape.is-active {
   background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
+}
+
+.context-menu-shape-icon {
+  width: 52px;
+  height: 34px;
+  flex: none;
+  overflow: visible;
+}
+
+.context-menu-shape-icon .diagram-box-outline {
+  stroke-width: 1.4;
+}
+
+.context-menu-shape-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.context-menu-shape-name {
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.context-menu-shape-meta {
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 11px;
+  line-height: 1.1;
 }
 
 @media (max-width: 760px) {
@@ -988,9 +838,48 @@ button {
     border-radius: 22px;
   }
 
+  .board-brand {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100vw - 20px);
+    padding: 10px 12px;
+  }
+
   .board-toolbar {
     gap: 6px;
     padding: 8px;
+  }
+
+  .board-toolbar--creation {
+    top: auto;
+    left: 10px;
+    right: 10px;
+    bottom: 56px;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .board-toolbar--creation .tool-divider {
+    width: 1px;
+    height: 24px;
+  }
+
+  .board-toolbar--app {
+    top: 68px;
+    left: 10px;
+    right: 10px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .board-toolbar--zoom {
+    right: 10px;
+    bottom: 108px;
+  }
+
+  .link-toolbar {
+    max-width: calc(100vw - 20px);
+    transform: translate(-50%, calc(-100% - 10px));
   }
 
   .tool-btn {
@@ -1003,7 +892,10 @@ button {
   }
 
   .board-status {
-    max-width: calc(100vw - 24px);
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
   }
 
   .context-menu {

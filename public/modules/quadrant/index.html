@@ -3,42 +3,95 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>快捷绘图板</title>
+  <title>Quadrant Board</title>
   <link rel="stylesheet" href="../shared/reveal.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main class="board-shell">
-    <section class="board-stage" aria-label="快捷绘图板">
-      <div class="board-toolbar" role="toolbar" aria-label="画布工具">
-        <button id="create-timeline-btn" class="tool-btn" type="button" title="创建时间线">
+    <section class="board-stage" aria-label="Quadrant board canvas">
+      <div class="board-brand">
+        <p class="board-brand-kicker">QUADRANT BOARD</p>
+        <strong>GoJS Figures 画布</strong>
+      </div>
+
+      <div class="board-toolbar board-toolbar--creation" role="toolbar" aria-label="Creation tools">
+        <button id="tool-select-btn" class="tool-btn tool-btn--mode" type="button" title="选择工具 (V)" aria-pressed="true">
+          <span aria-hidden="true">V</span>
+        </button>
+        <button id="tool-hand-btn" class="tool-btn tool-btn--mode" type="button" title="手型工具 (H 或空格)" aria-pressed="false">
+          <span aria-hidden="true">H</span>
+        </button>
+        <button id="tool-arrow-btn" class="tool-btn tool-btn--mode" type="button" title="箭头工具 (A)" aria-pressed="false">
+          <span aria-hidden="true">A</span>
+        </button>
+        <div class="tool-divider" aria-hidden="true"></div>
+        <button id="create-timeline-btn" class="tool-btn tool-btn--mode" type="button" title="时间线 (L)" aria-pressed="false">
           <span aria-hidden="true">L</span>
         </button>
-        <button id="create-note-btn" class="tool-btn" type="button" title="创建文本">
-          <span aria-hidden="true">T</span>
+        <button id="create-note-btn" class="tool-btn tool-btn--mode" type="button" title="文本 (N)" aria-pressed="false">
+          <span aria-hidden="true">N</span>
         </button>
-        <button id="create-box-btn" class="tool-btn" type="button" title="添加流程图节点">
+        <button id="create-box-btn" class="tool-btn tool-btn--mode" type="button" title="流程图节点 (B)" aria-pressed="false">
           <span aria-hidden="true">B</span>
         </button>
-        <div class="tool-divider" aria-hidden="true"></div>
-        <button id="zoom-out-btn" class="tool-btn" type="button" title="缩小">
-          <span aria-hidden="true">-</span>
+      </div>
+
+      <div class="board-toolbar board-toolbar--app" role="toolbar" aria-label="Board actions">
+        <button id="undo-btn" class="tool-btn" type="button" title="撤销 (Ctrl/Cmd+Z)">
+          <span aria-hidden="true">U</span>
         </button>
-        <button id="zoom-reset-btn" class="tool-btn tool-btn--label" type="button" title="重置缩放">1:1</button>
-        <button id="zoom-in-btn" class="tool-btn" type="button" title="放大">
-          <span aria-hidden="true">+</span>
+        <button id="redo-btn" class="tool-btn" type="button" title="重做 (Ctrl/Cmd+Shift+Z)">
+          <span aria-hidden="true">R</span>
         </button>
         <div class="tool-divider" aria-hidden="true"></div>
+        <button id="import-json-btn" class="tool-btn" type="button" title="导入 JSON">
+          <span aria-hidden="true">I</span>
+        </button>
+        <button id="export-json-btn" class="tool-btn" type="button" title="导出 JSON">
+          <span aria-hidden="true">J</span>
+        </button>
         <button id="export-png-btn" class="tool-btn" type="button" title="导出 PNG">
           <span aria-hidden="true">P</span>
         </button>
         <button id="clear-all-btn" class="tool-btn tool-btn--danger" type="button" title="清空画布">
           <span aria-hidden="true">X</span>
         </button>
+        <input id="import-json-input" type="file" accept=".json,application/json" hidden>
+      </div>
+
+      <div class="board-toolbar board-toolbar--zoom" role="toolbar" aria-label="Zoom controls">
+        <button id="zoom-out-btn" class="tool-btn" type="button" title="缩小">
+          <span aria-hidden="true">-</span>
+        </button>
+        <button id="zoom-reset-btn" class="tool-btn tool-btn--label" type="button" title="重置缩放">100%</button>
+        <button id="zoom-in-btn" class="tool-btn" type="button" title="放大">
+          <span aria-hidden="true">+</span>
+        </button>
+      </div>
+
+      <div id="link-toolbar" class="link-toolbar" role="toolbar" aria-label="Link styles" hidden>
+        <div class="link-toolbar-group" role="group" aria-label="Line style">
+          <button id="link-stroke-solid-btn" class="tool-btn tool-btn--mini" type="button" title="实线">
+            <span aria-hidden="true">S</span>
+          </button>
+          <button id="link-stroke-dashed-btn" class="tool-btn tool-btn--mini" type="button" title="虚线">
+            <span aria-hidden="true">D</span>
+          </button>
+        </div>
+        <div class="tool-divider" aria-hidden="true"></div>
+        <div class="link-toolbar-group" role="group" aria-label="Arrow style">
+          <button id="link-marker-arrow-btn" class="tool-btn tool-btn--mini" type="button" title="显示箭头">
+            <span aria-hidden="true">-&gt;</span>
+          </button>
+          <button id="link-marker-none-btn" class="tool-btn tool-btn--mini" type="button" title="隐藏箭头">
+            <span aria-hidden="true">0</span>
+          </button>
+        </div>
       </div>
 
       <div id="empty-state" class="empty-state">
-        右键方框可切换 Lucidchart Flowchart Symbols，点击时间线刻度可直接添加文本。
+        选择左侧工具后开始创建。右键节点可切换 GoJS Figures，箭头工具支持拖拽连线。
       </div>
 
       <div id="status-text" class="board-status">画布已就绪。</div>
@@ -65,7 +118,6 @@
         <button type="button" class="context-menu-btn" data-action="create-note">创建文本</button>
         <button type="button" class="context-menu-btn" data-action="clear-text">清空文本</button>
         <button type="button" class="context-menu-btn" data-action="delete-item">删除元素</button>
-        <button id="batch-link-menu-btn" type="button" class="context-menu-btn" data-action="toggle-batch-link" hidden>批量连线</button>
         <div id="box-shape-divider" class="context-menu-divider" hidden></div>
         <div id="box-shape-menu" class="context-menu-shapes" hidden></div>
       </div>

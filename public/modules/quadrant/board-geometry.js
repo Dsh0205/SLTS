@@ -11,6 +11,7 @@ import {
   WORLD_PADDING,
   clamp,
 } from "./board-state.js";
+import { buildBoxShapeModel, getBoxShapeAnchorKind } from "./board-shapes.js";
 
 export const TIMELINE_INSET_X = 18;
 export const TIMELINE_TITLE_WIDTH = 148;
@@ -18,6 +19,12 @@ export const TIMELINE_TRACK_GAP = 16;
 export const TIMELINE_TRACK_RIGHT_PADDING = 24;
 export const TIMELINE_TRACK_TOP = 24;
 export const TIMELINE_TRACK_HEIGHT = 30;
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const OUTLINE_SAMPLE_DISTANCE = 6;
+const OUTLINE_SAMPLE_MIN_POINTS = 64;
+const OUTLINE_SAMPLE_MAX_POINTS = 280;
+const SHAPE_OUTLINE_POINT_CACHE = new Map();
 
 export function computeWorldSize(state, viewport, zoom) {
   const minWidth = Math.max(WORLD_MIN_WIDTH, Math.ceil(viewport.clientWidth / zoom));
@@ -174,13 +181,208 @@ function getDiamondAnchor(item, towardX, towardY) {
   };
 }
 
+function crossProduct(ax, ay, bx, by) {
+  return ax * by - ay * bx;
+}
+
+function dotProduct(ax, ay, bx, by) {
+  return ax * bx + ay * by;
+}
+
+function getShapeOutlinePoints(item) {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const model = buildBoxShapeModel(item.shape, item.width, item.height);
+  const cacheKey = `${model.id}:${item.width.toFixed(2)}:${item.height.toFixed(2)}`;
+
+  if (SHAPE_OUTLINE_POINT_CACHE.has(cacheKey)) {
+    return SHAPE_OUTLINE_POINT_CACHE.get(cacheKey);
+  }
+
+  try {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", model.outlineD);
+
+    const totalLength = path.getTotalLength();
+    if (!Number.isFinite(totalLength) || totalLength <= 0) {
+      SHAPE_OUTLINE_POINT_CACHE.set(cacheKey, null);
+      return null;
+    }
+
+    const sampleCount = clamp(
+      Math.ceil(totalLength / OUTLINE_SAMPLE_DISTANCE),
+      OUTLINE_SAMPLE_MIN_POINTS,
+      OUTLINE_SAMPLE_MAX_POINTS,
+    );
+    const points = [];
+
+    for (let index = 0; index < sampleCount; index += 1) {
+      const point = path.getPointAtLength((index / sampleCount) * totalLength);
+      points.push({ x: point.x, y: point.y });
+    }
+
+    if (!points.length) {
+      SHAPE_OUTLINE_POINT_CACHE.set(cacheKey, null);
+      return null;
+    }
+
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (Math.abs(first.x - last.x) > 0.1 || Math.abs(first.y - last.y) > 0.1) {
+      points.push({ ...first });
+    }
+
+    SHAPE_OUTLINE_POINT_CACHE.set(cacheKey, points);
+    return points;
+  } catch {
+    SHAPE_OUTLINE_POINT_CACHE.set(cacheKey, null);
+    return null;
+  }
+}
+
+function getRaySegmentIntersection(origin, direction, start, end) {
+  const rayX = direction.x;
+  const rayY = direction.y;
+  const segmentX = end.x - start.x;
+  const segmentY = end.y - start.y;
+  const offsetX = start.x - origin.x;
+  const offsetY = start.y - origin.y;
+  const cross = crossProduct(rayX, rayY, segmentX, segmentY);
+  const offsetCrossRay = crossProduct(offsetX, offsetY, rayX, rayY);
+  const epsilon = 1e-6;
+
+  if (Math.abs(cross) < epsilon) {
+    if (Math.abs(offsetCrossRay) >= epsilon) {
+      return null;
+    }
+
+    const rayLengthSquared = dotProduct(rayX, rayY, rayX, rayY);
+    if (!rayLengthSquared) {
+      return null;
+    }
+
+    const startT = dotProduct(start.x - origin.x, start.y - origin.y, rayX, rayY) / rayLengthSquared;
+    const endT = dotProduct(end.x - origin.x, end.y - origin.y, rayX, rayY) / rayLengthSquared;
+    const candidateT = [startT, endT].filter((value) => value >= 0);
+
+    if (!candidateT.length) {
+      return null;
+    }
+
+    const t = Math.min(...candidateT);
+    return {
+      t,
+      point: {
+        x: origin.x + rayX * t,
+        y: origin.y + rayY * t,
+      },
+    };
+  }
+
+  const t = crossProduct(offsetX, offsetY, segmentX, segmentY) / cross;
+  const u = offsetCrossRay / cross;
+
+  if (t < 0 || u < -epsilon || u > 1 + epsilon) {
+    return null;
+  }
+
+  return {
+    t,
+    point: {
+      x: origin.x + rayX * t,
+      y: origin.y + rayY * t,
+    },
+  };
+}
+
+function getNearestOutlinePointOnRay(origin, direction, points) {
+  const directionLength = Math.hypot(direction.x, direction.y);
+  if (!directionLength) {
+    return null;
+  }
+
+  let best = null;
+
+  points.forEach((point) => {
+    const vectorX = point.x - origin.x;
+    const vectorY = point.y - origin.y;
+    const projection = dotProduct(vectorX, vectorY, direction.x, direction.y) / directionLength;
+
+    if (projection <= 0) {
+      return;
+    }
+
+    const distanceToRay = Math.abs(crossProduct(vectorX, vectorY, direction.x, direction.y)) / directionLength;
+    if (!best || distanceToRay < best.distance - 0.5 || (
+      Math.abs(distanceToRay - best.distance) <= 0.5
+      && projection > best.projection
+    )) {
+      best = {
+        point,
+        distance: distanceToRay,
+        projection,
+      };
+    }
+  });
+
+  return best?.point || null;
+}
+
+function getOutlineAnchor(item, towardX, towardY) {
+  const points = getShapeOutlinePoints(item);
+  if (!points?.length) {
+    return null;
+  }
+
+  const localCenter = {
+    x: item.width / 2,
+    y: item.height / 2,
+  };
+  const direction = {
+    x: towardX - (item.x + localCenter.x),
+    y: towardY - (item.y + localCenter.y),
+  };
+
+  if (!direction.x && !direction.y) {
+    return getRectCenter(item);
+  }
+
+  let bestIntersection = null;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const intersection = getRaySegmentIntersection(localCenter, direction, points[index - 1], points[index]);
+    if (!intersection) {
+      continue;
+    }
+
+    if (!bestIntersection || intersection.t < bestIntersection.t) {
+      bestIntersection = intersection;
+    }
+  }
+
+  const localPoint = bestIntersection?.point || getNearestOutlinePointOnRay(localCenter, direction, points);
+  if (!localPoint) {
+    return null;
+  }
+
+  return {
+    x: item.x + localPoint.x,
+    y: item.y + localPoint.y,
+  };
+}
+
 function getShapeAnchor(item, towardX, towardY) {
-  switch (item.shape) {
-    case "connector":
-    case "or":
-    case "summing-junction":
+  const outlineAnchor = getOutlineAnchor(item, towardX, towardY);
+  if (outlineAnchor) {
+    return outlineAnchor;
+  }
+
+  switch (getBoxShapeAnchorKind(item.shape)) {
+    case "ellipse":
       return getEllipseAnchor(item, towardX, towardY);
-    case "decision":
+    case "diamond":
       return getDiamondAnchor(item, towardX, towardY);
     default:
       return getRectAnchor(item, towardX, towardY);
@@ -188,16 +390,33 @@ function getShapeAnchor(item, towardX, towardY) {
 }
 
 function getPrimaryLinkDirection(fromBox, toBox) {
-  const fromCenter = getRectCenter(fromBox);
-  const toCenter = getRectCenter(toBox);
-  const dx = toCenter.x - fromCenter.x;
-  const dy = toCenter.y - fromCenter.y;
+  return getPrimaryDirectionBetweenPoints(getRectCenter(fromBox), getRectCenter(toBox));
+}
+
+function getPrimaryDirectionBetweenPoints(fromPoint, toPoint) {
+  const dx = toPoint.x - fromPoint.x;
+  const dy = toPoint.y - fromPoint.y;
 
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0 ? "right" : "left";
   }
 
   return dy >= 0 ? "down" : "up";
+}
+
+function getOppositeDirection(direction) {
+  switch (direction) {
+    case "right":
+      return "left";
+    case "left":
+      return "right";
+    case "down":
+      return "up";
+    case "up":
+      return "down";
+    default:
+      return direction;
+  }
 }
 
 function getDirectionalAnchor(item, direction) {
@@ -215,6 +434,33 @@ function getDirectionalAnchor(item, direction) {
     default:
       return center;
   }
+}
+
+function buildOrthogonalGeometry(start, end, direction) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+
+  if (Math.abs(dx) < 1 || Math.abs(dy) < 1) {
+    return geometryFromPoints([start, end], start);
+  }
+
+  if (direction === "right" || direction === "left") {
+    const midX = start.x + dx / 2;
+    return geometryFromPoints([
+      start,
+      { x: midX, y: start.y },
+      { x: midX, y: end.y },
+      end,
+    ], start);
+  }
+
+  const midY = start.y + dy / 2;
+  return geometryFromPoints([
+    start,
+    { x: start.x, y: midY },
+    { x: end.x, y: midY },
+    end,
+  ], start);
 }
 
 function collapseLinkPoints(points) {
@@ -252,9 +498,8 @@ function getSharedRunOffset(distances) {
 }
 
 function buildBundledGeometry(entry, direction, sharedCoordinate) {
-  const fromCenter = getRectCenter(entry.fromBox);
   const start = getDirectionalAnchor(entry.fromBox, direction);
-  const end = getShapeAnchor(entry.toBox, fromCenter.x, fromCenter.y);
+  const end = getDirectionalAnchor(entry.toBox, getOppositeDirection(direction));
 
   if (direction === "right" || direction === "left") {
     return geometryFromPoints([
@@ -274,36 +519,16 @@ function buildBundledGeometry(entry, direction, sharedCoordinate) {
 }
 
 export function buildResolvedLinkGeometry(fromBox, toBox) {
-  const toCenter = getRectCenter(toBox);
-  const fromCenter = getRectCenter(fromBox);
-  const start = getShapeAnchor(fromBox, toCenter.x, toCenter.y);
-  const end = getShapeAnchor(toBox, fromCenter.x, fromCenter.y);
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
+  const direction = getPrimaryLinkDirection(fromBox, toBox);
+  const start = getDirectionalAnchor(fromBox, direction);
+  const end = getDirectionalAnchor(toBox, getOppositeDirection(direction));
+  return buildOrthogonalGeometry(start, end, direction);
+}
 
-  let points;
-
-  if (Math.abs(dx) < 1 || Math.abs(dy) < 1) {
-    points = [start, end];
-  } else if (Math.abs(dx) >= Math.abs(dy)) {
-    const midX = start.x + dx / 2;
-    points = [
-      start,
-      { x: midX, y: start.y },
-      { x: midX, y: end.y },
-      end,
-    ];
-  } else {
-    const midY = start.y + dy / 2;
-    points = [
-      start,
-      { x: start.x, y: midY },
-      { x: end.x, y: midY },
-      end,
-    ];
-  }
-
-  return geometryFromPoints(points, start);
+export function buildPreviewLinkGeometry(fromBox, targetPoint) {
+  const direction = getPrimaryDirectionBetweenPoints(getRectCenter(fromBox), targetPoint);
+  const start = getDirectionalAnchor(fromBox, direction);
+  return buildOrthogonalGeometry(start, targetPoint, direction);
 }
 
 export function buildResolvedLinkGeometries(links, boxes) {
@@ -346,8 +571,7 @@ export function buildResolvedLinkGeometries(links, boxes) {
     const direction = groupEntries[0].direction;
     const sharedStart = getDirectionalAnchor(groupEntries[0].fromBox, direction);
     const distances = groupEntries.map((entry) => {
-      const fromCenter = getRectCenter(entry.fromBox);
-      const end = getShapeAnchor(entry.toBox, fromCenter.x, fromCenter.y);
+      const end = getDirectionalAnchor(entry.toBox, getOppositeDirection(direction));
 
       switch (direction) {
         case "right":
