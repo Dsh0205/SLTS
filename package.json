@@ -1,9 +1,13 @@
 {
   "name": "shanlic-life-tracker-system",
-  "version": "1.6.7",
+  "description": "A modular personal desktop tracker built with Vue and Electron.",
+  "version": "1.6.8",
   "private": true,
   "main": "electron/main.cjs",
   "type": "module",
+  "author": {
+    "name": "Dsh0205"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Dsh0205/SLTS.git"
@@ -64,6 +68,7 @@
     "win": {
       "icon": "electron/assets/icon-256.png",
       "executableName": "SHANLIC LIFE TRACKER SYSTEM",
+      "artifactName": "SHANLIC-LIFE-TRACKER-SYSTEM-Setup-${version}.${ext}",
       "target": [
         "nsis"
       ]
