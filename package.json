@@ -1,7 +1,7 @@
 {
   "name": "shanlic-life-tracker-system",
   "description": "A modular personal desktop tracker built with Vue and Electron.",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "private": true,
   "main": "electron/main.cjs",
   "type": "module",

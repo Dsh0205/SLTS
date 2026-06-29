@@ -406,6 +406,11 @@
           <button id="search-btn" class="btn search">搜索</button>
           <button id="clear-search" class="btn">清除</button>
         </div>
+        <div class="controls" style="margin-top: 12px;" aria-label="内容备份设置">
+          <button id="export-data" class="btn primary" type="button">导出内容</button>
+          <button id="import-data" class="btn" type="button">导入内容</button>
+          <input id="import-data-file" type="file" accept=".json,application/json" hidden>
+        </div>
         <div class="table-wrap">
           <table class="table" aria-label="每日大赛条目列表">
             <thead>
@@ -446,6 +451,9 @@
     const searchBtn = document.getElementById("search-btn");
     const clearSearchBtn = document.getElementById("clear-search");
     const invalidList = document.getElementById("invalid-list");
+    const exportDataBtn = document.getElementById("export-data");
+    const importDataBtn = document.getElementById("import-data");
+    const importDataFile = document.getElementById("import-data-file");
 
     let currentQuery = "";
 
@@ -486,6 +494,107 @@
 
     function saveInvalid(arr) {
       localStorage.setItem(storageConfig.invalidKey, JSON.stringify(arr));
+    }
+
+    function normalizeEntry(item) {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const code = String(item.code || "").trim();
+      const content = String(item.content || "").trim();
+      const actor = String(item.actor || "").trim();
+
+      if (!code || !actor) {
+        return null;
+      }
+
+      return { code, content, actor };
+    }
+
+    function buildBackupPayload() {
+      return {
+        app: "shanlic-mrds",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: loadEntries().map(normalizeEntry).filter(Boolean),
+        invalid: loadInvalid().map((line) => String(line || "").trim()).filter(Boolean)
+      };
+    }
+
+    function readBackupPayload(rawText) {
+      const parsed = JSON.parse(rawText);
+      const source = parsed && typeof parsed === "object" ? parsed : {};
+      const entries = Array.isArray(source.entries) ? source.entries.map(normalizeEntry).filter(Boolean) : [];
+      const invalid = Array.isArray(source.invalid)
+        ? source.invalid.map((line) => String(line || "").trim()).filter(Boolean)
+        : [];
+
+      if (!Array.isArray(source.entries) && !Array.isArray(source.invalid)) {
+        throw new Error("Invalid backup file.");
+      }
+
+      return { entries, invalid };
+    }
+
+    function createBackupFileName() {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+      return `shanlic-mrds-backup-${stamp}.json`;
+    }
+
+    function downloadTextFile(fileName, text) {
+      const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function exportBackup() {
+      const fileName = createBackupFileName();
+      const text = JSON.stringify(buildBackupPayload(), null, 2);
+
+      try {
+        downloadTextFile(fileName, text);
+        showToast("已导出每日大赛内容备份");
+      } catch (error) {
+        console.error(error);
+        showToast("导出失败，请稍后再试");
+      }
+    }
+
+    async function importBackupFromFile(file) {
+      if (!file) {
+        return;
+      }
+
+      try {
+        const payload = readBackupPayload(await file.text());
+        const confirmed = window.confirm(
+          `导入后会覆盖当前每日大赛内容。\n\n将导入 ${payload.entries.length} 条内容，${payload.invalid.length} 条无法识别文本。\n\n确定继续吗？`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        saveEntries(payload.entries);
+        saveInvalid(payload.invalid);
+        currentQuery = "";
+        searchBox.value = "";
+        render();
+        renderInvalid();
+        showToast("已导入每日大赛内容备份");
+      } catch (error) {
+        console.error(error);
+        showToast("导入失败，请选择正确的 JSON 备份");
+      } finally {
+        importDataFile.value = "";
+      }
     }
 
     function parseLine(line) {
@@ -840,6 +949,9 @@
         render();
       }
     });
+    exportDataBtn.addEventListener("click", exportBackup);
+    importDataBtn.addEventListener("click", () => importDataFile.click());
+    importDataFile.addEventListener("change", () => importBackupFromFile(importDataFile.files[0]));
 
     render();
     renderInvalid();
